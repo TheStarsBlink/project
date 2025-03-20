@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cesium 场景截图</title>
+    <script src="/cesium/Cesium/Cesium.js"></script>
+    <link href="/cesium/Cesium/Widgets/widgets.css" rel="stylesheet">
+    <style>
+        html, body, #cesiumContainer {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        #cesiumContainer {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="cesiumContainer"></div>
+    <script>
+        // 设置 Cesium ion 访问令牌
+        Cesium.Ion.defaultAccessToken = 'YOUR_ACCESS_TOKEN';
+
+        // 初始化 Cesium Viewer
+        const viewer = new Cesium.Viewer('cesiumContainer', {
+            animation: false,
+            baseLayerPicker: false,
+            fullscreenButton: false,
+            geocoder: false,
+            homeButton: false,
+            navigationHelpButton: false,
+            sceneModePicker: false,
+            timeline: false
+        });
+
+        // 异步设置地形提供者
+        async function setupTerrain() {
+            const terrainProvider = await Cesium.createWorldTerrainAsync({
+                requestWaterMask: true,
+                requestVertexNormals: true
+            });
+            viewer.terrainProvider = terrainProvider;
+
+            // 设置相机位置
+            viewer.camera.setView({
+                destination: Cesium.Cartesian3.fromDegrees(116.3915, 39.9053, 15000000), // 北京上空
+                orientation: {
+                    heading: 0.0,
+                    pitch: -Cesium.Math.PI_OVER_TWO,
+                    roll: 0.0
+                }
+            });
+
+            // 将 viewer 实例保存到全局变量，方便 Puppeteer 检测
+            window.viewer = viewer;
+        }
+
+        setupTerrain();
+    </script>
+</body>
+</html> 

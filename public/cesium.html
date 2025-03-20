@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.107/Build/Cesium/Cesium.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.107/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+</head>
+<body>
+  <div id="cesiumContainer" style="width: 1024px; height: 768px;"></div>
+  <script>
+    // 使用前请替换为您申请的Cesium访问令牌
+    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJiMjIwODczNi04Y2VhLTQwYWYtYTI0YS0yMDM1MTVhMWZjYzQiLCJpZCI6Mjg2MTIxLCJpYXQiOjE3NDI0ODI0MTF9.JBzcbfb732oYnbaUs6E1YrQ6RK-v9yiWuyVcydo68Nw';
+
+    // 初始化地图
+    const viewer = new Cesium.Viewer('cesiumContainer', {
+      terrain: Cesium.Terrain.fromWorldTerrain(),
+      animation: false,
+      timeline: false
+    });
+
+    // 设置初始视角
+    viewer.camera.setView({
+      destination: Cesium.Cartesian3.fromDegrees(116.39, 39.9, 1500),
+      orientation: {
+        heading: Cesium.Math.toRadians(0),
+        pitch: Cesium.Math.toRadians(-30),
+        roll: 0
+      }
+    });
+
+    // 暴露viewer到全局
+    window.viewer = viewer;
+  </script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+npm-debug.log
+screenshot.png
+.git
+.gitignore
+Dockerfile
+.dockerignore
+*.md
+*.log 
