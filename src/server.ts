@@ -12,10 +12,71 @@ import { GeoDataProcessor, GeoDataOptions } from './utils/geoData';
 import path from 'path';
 import fs from 'fs';
 import { setTimeout } from 'timers/promises';
+import os from 'os';
 
 const app = express();
 const port = process.env.PORT || 3000;
 const MAX_CONCURRENT_JOBS = Number(process.env.MAX_CONCURRENT_JOBS) || 5;
+
+// 根据操作系统自动获取Chrome可执行文件路径
+function getChromePath(): string | undefined {
+  const platform = os.platform();
+  
+  // 如果有环境变量设置的路径，优先使用
+  if (process.env.CHROME_PATH) {
+    return process.env.CHROME_PATH;
+  }
+
+  // 根据不同操作系统返回默认Chrome路径
+  switch(platform) {
+    case 'win32': {
+      // Windows 常见路径
+      const windowsPaths = [
+        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+        process.env.LOCALAPPDATA + '\\Google\\Chrome\\Application\\chrome.exe',
+      ];
+      for (const path of windowsPaths) {
+        if (fs.existsSync(path)) {
+          return path;
+        }
+      }
+      break;
+    }
+    case 'linux': {
+      // Linux 常见路径
+      const linuxPaths = [
+        '/usr/bin/google-chrome',
+        '/usr/bin/chrome',
+        '/usr/bin/chromium',
+        '/usr/bin/chromium-browser',
+      ];
+      for (const path of linuxPaths) {
+        if (fs.existsSync(path)) {
+          return path;
+        }
+      }
+      break;
+    }
+    case 'darwin': {
+      // macOS 常见路径
+      const macPaths = [
+        '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+        '/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary',
+      ];
+      for (const path of macPaths) {
+        if (fs.existsSync(path)) {
+          return path;
+        }
+      }
+      break;
+    }
+  }
+  
+  // 没有找到Chrome，返回undefined，让Puppeteer自己尝试查找
+  console.log('未找到Chrome可执行文件路径，Puppeteer将尝试自动查找');
+  return undefined;
+}
 
 // 默认浏览器配置
 const DEFAULT_BROWSER_CONFIG: BrowserConfig = {
@@ -28,8 +89,12 @@ const DEFAULT_BROWSER_CONFIG: BrowserConfig = {
     '--disable-web-security',
     '--disable-features=IsolateOrigins,site-per-process'
   ],
-  executablePath: process.env.CHROME_PATH
+  executablePath: getChromePath()
 };
+
+// 记录Chrome配置信息
+console.log(`操作系统: ${os.platform()}`);
+console.log(`Chrome路径: ${DEFAULT_BROWSER_CONFIG.executablePath || '由Puppeteer自动查找'}`);
 
 // 默认页面配置
 const DEFAULT_PAGE_CONFIG: PageConfig = {
@@ -239,27 +304,51 @@ app.get('/screenshot', async (_req: Request, res: Response) => {
           console.log('视口设置完成');
         }
 
-        // 设置超时时间
-        page.setDefaultNavigationTimeout(DEFAULT_PAGE_CONFIG.navigationTimeout);
-        page.setDefaultTimeout(DEFAULT_PAGE_CONFIG.timeout);
+        // 设置更长的超时时间
+        const extendedTimeout = 120000; // 两分钟
+        page.setDefaultNavigationTimeout(extendedTimeout);
+        page.setDefaultTimeout(extendedTimeout);
 
         // 加载包含 Cesium 的页面
         console.log('开始加载页面...');
-        await page.goto(`http://localhost:${port}/cesium.html`, {
-          waitUntil: 'networkidle0'
-        });
-        console.log('页面加载完成');
+        try {
+          // 使用file协议直接加载文件，避免本地服务器问题
+          const htmlPath = path.resolve(process.cwd(), 'public/cesium.html');
+          await page.goto(`file://${htmlPath}`, {
+            waitUntil: 'domcontentloaded' // 使用更宽松的等待条件
+          });
+          console.log('页面加载完成 (使用文件协议)');
+        } catch (loadError) {
+          console.log('文件协议加载失败，尝试使用HTTP协议...');
+          // 如果文件协议失败，回退到HTTP
+          await page.goto(`http://localhost:${port}/cesium.html`, {
+            waitUntil: 'domcontentloaded'
+          });
+          console.log('页面加载完成 (使用HTTP协议)');
+        }
+        
+        // 注入检测代码，用于检查Cesium加载状态
+        console.log('等待页面内容渲染...');
+        await page.waitForSelector('#cesiumContainer', { timeout: 10000 })
+          .catch(() => console.log('未找到cesiumContainer元素，继续执行'));
 
-        // 等待 Cesium 场景加载完成
-        console.log('等待 Cesium 场景加载...');
-        await page.waitForFunction(() => {
-          return window.viewer && window.viewer.scene && window.viewer.scene.globe;
-        }, { timeout: DEFAULT_PAGE_CONFIG.timeout });
-        console.log('Cesium 场景加载完成');
-
-        // 等待一段时间确保场景完全渲染
-        await setTimeout(5000);
-        console.log('等待额外渲染时间完成');
+        // 等待一段时间确保渲染
+        console.log('等待页面渲染...');
+        await setTimeout(8000);
+        
+        // 尝试等待Cesium加载，但如果失败也继续执行
+        try {
+          console.log('等待 Cesium 场景加载...');
+          await page.waitForFunction(() => {
+            return window.viewer && window.viewer.scene;
+          }, { timeout: 10000 });
+          console.log('Cesium 场景加载完成');
+          
+          // 再等待额外时间让地球渲染
+          await setTimeout(5000);
+        } catch (cesiumError) {
+          console.log('Cesium场景等待超时，但仍将尝试截图');
+        }
 
         // 截图
         console.log('开始截图...');
@@ -407,7 +496,7 @@ declare global {
   interface Window {
     viewer: {
       scene: {
-        globe: any;
+        globe: object;
       };
     };
   }

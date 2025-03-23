@@ -128,8 +128,8 @@ export class GeoDataProcessor {
         <head>
           <meta charset="UTF-8">
           <title>GeoData Viewer</title>
-          <script src="/cesium/Cesium/Cesium.js"></script>
-          <link href="/cesium/Cesium/Widgets/widgets.css" rel="stylesheet">
+          <script src="./cesium/Cesium/Cesium.js"></script>
+          <link href="./cesium/Cesium/Widgets/widgets.css" rel="stylesheet">
           <style>
             #cesiumContainer {
               width: 100%;
