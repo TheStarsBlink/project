@@ -2,12 +2,34 @@ version: '3.8'
 
 services:
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cesium-screenshot-service
     ports:
       - "3000:3000"
     volumes:
+      # 只挂载配置文件和源代码，确保依赖和浏览器都使用容器内的版本
       - ./src:/app/src
       - ./public:/app/public
+      - ./tsconfig.json:/app/tsconfig.json
     environment:
       - NODE_ENV=development
-    command: npm run dev 
+      - PORT=3000
+      - MAX_CONCURRENT_JOBS=5
+      # 使用容器内的Chromium
+      - PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+      - CHROME_PATH=/usr/bin/chromium
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    command: >
+      bash -c "
+        npm run build &&
+        node dist/server.js
+      " 

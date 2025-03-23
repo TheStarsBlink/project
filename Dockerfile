@@ -1,8 +1,11 @@
-# 使用官方 Node.js 作为基础镜像
+# 使用 Node.js 18 作为基础镜像
 FROM node:18-slim
 
-# 安装必要的依赖
-RUN apt-get update && apt-get install -y \
+# 设置工作目录
+WORKDIR /app
+
+# 安装必要的依赖项，包括 Chromium 和其他必须的库
+RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     gnupg \
     ca-certificates \
@@ -24,54 +27,38 @@ RUN apt-get update && apt-get install -y \
     libxfixes3 \
     libxrandr2 \
     xdg-utils \
-    libgtk-4-1 \
-    --no-install-recommends \
+    unzip \
+    chromium \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# 创建工作目录
-WORKDIR /app
+# 设置环境变量，告诉 Puppeteer 使用已安装的 Chromium
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+ENV CHROME_PATH=/usr/bin/chromium
 
-# 复制 Chrome 安装包并安装
-COPY resources/google-chrome-stable.deb /tmp/
-RUN apt-get update && apt-get install -y /tmp/google-chrome-stable.deb --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/* \
-    && rm /tmp/google-chrome-stable.deb
-
-# 复制 package.json 和 package-lock.json
+# 复制 package.json 和 package-lock.json (或 yarn.lock)
 COPY package*.json ./
 
-# 安装所有依赖，包括开发依赖
+# 安装依赖
 RUN npm ci
 
-# 复制 TypeScript 配置文件
-COPY tsconfig.json ./
-
-# 复制 Cesium 库（如果需要）
-COPY resources/Cesium-1.111.zip /tmp/
-RUN mkdir -p /app/public/cesium \
-    && unzip /tmp/Cesium-1.111.zip -d /app/public/cesium \
-    && rm /tmp/Cesium-1.111.zip
-
 # 复制源代码
-COPY src/ ./src/
-COPY public/ ./public/
+COPY . .
+
+# 确保 public/cesium 目录存在
+RUN mkdir -p public/cesium/Cesium
+
+# 如果 node_modules/cesium 存在，则复制到 public/cesium
+RUN if [ -d "node_modules/cesium/Build/Cesium" ]; then \
+      cp -r node_modules/cesium/Build/Cesium/* public/cesium/Cesium/ || true; \
+    fi
 
 # 编译 TypeScript
 RUN npm run build
 
-# 确保 public 目录存在
-RUN mkdir -p /app/public
-
-# 设置环境变量
-ENV CHROME_PATH=/usr/bin/google-chrome-stable
-ENV NODE_ENV=production
-
-# 暴露端口
+# 暴露服务端口
 EXPOSE 3000
 
-# 健康检查
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/status || exit 1
-
-# 启动服务
+# 启动命令
 CMD ["node", "dist/server.js"] 
