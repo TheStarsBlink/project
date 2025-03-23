@@ -3,36 +3,36 @@ import supertest from 'supertest';
 import express from 'express';
 import { jest } from '@jest/globals';
 import puppeteer from 'puppeteer';
-import path from 'path';
 import fs from 'fs';
 import os from 'os';
-import { ScreenshotRequest } from '../types';
-import '../server';  // 直接导入服务器文件
+import * as server from '../server';  // 使用命名导入而不是直接导入
 
 // 创建一个简单的 Express 服务器用于测试
 const app = express();
 app.use(express.static('public'));
 app.use(express.json());
 
-// 导入应用之前，设置一些模拟
+// 使用正确的类型声明进行模拟
 jest.mock('puppeteer', () => {
+  const mockScreenshot = jest.fn().mockResolvedValue(Buffer.from('fake-image-data'));
+  const mockPage = {
+    setViewport: jest.fn().mockResolvedValue(undefined),
+    setDefaultNavigationTimeout: jest.fn(),
+    setDefaultTimeout: jest.fn(),
+    setUserAgent: jest.fn().mockResolvedValue(undefined),
+    goto: jest.fn().mockResolvedValue(undefined),
+    waitForSelector: jest.fn().mockResolvedValue(undefined),
+    waitForFunction: jest.fn().mockResolvedValue(undefined),
+    $: jest.fn().mockResolvedValue({
+      screenshot: mockScreenshot
+    }),
+    screenshot: mockScreenshot,
+    close: jest.fn().mockResolvedValue(undefined),
+  };
   return {
     launch: jest.fn().mockResolvedValue({
-      newPage: jest.fn().mockResolvedValue({
-        setViewport: jest.fn().mockResolvedValue(null),
-        setDefaultNavigationTimeout: jest.fn(),
-        setDefaultTimeout: jest.fn(),
-        setUserAgent: jest.fn().mockResolvedValue(null),
-        goto: jest.fn().mockResolvedValue(null),
-        waitForSelector: jest.fn().mockResolvedValue(null),
-        waitForFunction: jest.fn().mockResolvedValue(null),
-        $: jest.fn().mockResolvedValue({
-          screenshot: jest.fn().mockResolvedValue(Buffer.from('fake-image-data'))
-        }),
-        screenshot: jest.fn().mockResolvedValue(Buffer.from('fake-image-data')),
-        close: jest.fn().mockResolvedValue(null),
-      }),
-      close: jest.fn().mockResolvedValue(null),
+      newPage: jest.fn().mockResolvedValue(mockPage),
+      close: jest.fn().mockResolvedValue(undefined),
     })
   };
 });
@@ -47,7 +47,7 @@ describe('服务器及截图功能测试', () => {
   describe('静态文件服务', () => {
     test('静态文件目录应该正确配置', () => {
       // 验证Express app中的static中间件设置
-      const middleware = app._router.stack.find((layer: any) => 
+      const middleware = app._router.stack.find((layer: {name: string; regexp: RegExp}) => 
         layer.name === 'serveStatic' && layer.regexp.toString().includes('public'));
       expect(middleware).toBeDefined();
     });
@@ -60,9 +60,8 @@ describe('服务器及截图功能测试', () => {
     });
 
     test('getChromePath应该返回Chrome路径或undefined', () => {
-      // 导入getChromePath函数
-      const { getChromePath } = require('../server');
-      const chromePath = getChromePath();
+      // 使用导入的server模块
+      const chromePath = server.getChromePath();
       
       // 路径可能存在也可能不存在，但类型应该是string或undefined
       expect(typeof chromePath === 'string' || typeof chromePath === 'undefined').toBe(true);
@@ -264,4 +263,4 @@ describe('服务器及截图功能测试', () => {
       expect(response.text).toBe('文件不存在');
     });
   });
-}); 
+});
