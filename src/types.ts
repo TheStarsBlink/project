@@ -25,23 +25,23 @@ export interface ScreenshotOptions {
 // 状态响应接口
 export interface StatusResponse {
   queueLength: number;
-  processingJobs: number;
+  processing: number;
   maxConcurrentJobs: number;
   browserActive: boolean;
-  lastActivity: number;
+  lastActivity: string;
 }
 
 // 工作队列任务接口
 export interface QueueTask<T> {
-  task: () => Promise<T>;
-  resolve: (value: T) => void;
+  fn: () => Promise<T>;
+  resolve: (value: T | PromiseLike<T>) => void;
   reject: (reason?: any) => void;
 }
 
 // 浏览器配置接口
 export interface BrowserConfig {
-  headless: 'new' | boolean;
-  args: string[];
+  headless?: boolean | 'new';
+  args?: string[];
   executablePath?: string;
 }
 

@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import puppeteer, { Browser, Page } from 'puppeteer';
+import * as puppeteer from 'puppeteer';
 import {
   ScreenshotRequest,
   ScreenshotOptions,
@@ -11,6 +11,7 @@ import {
 import { GeoDataProcessor, GeoDataOptions } from './utils/geoData';
 import path from 'path';
 import fs from 'fs';
+import { setTimeout } from 'timers/promises';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -40,24 +41,68 @@ const DEFAULT_PAGE_CONFIG: PageConfig = {
 
 // 工作队列
 class ScreenshotQueue {
-  private queue: QueueTask<Buffer>[] = [];
+  private browserInstance: puppeteer.Browser | null = null;
+  private queue: QueueTask<Uint8Array>[] = [];
   private processing = 0;
-  private maxConcurrent: number;
-  private browserInstance: Browser | null = null;
-  private lastActivity: number = Date.now();
+  private active = false;
+  private lastActivity = Date.now();
+  private readonly maxConcurrentJobs: number;
 
-  constructor(maxConcurrent: number) {
-    this.maxConcurrent = maxConcurrent;
+  constructor(maxConcurrentJobs = MAX_CONCURRENT_JOBS) {
+    this.maxConcurrentJobs = maxConcurrentJobs;
   }
 
-  async getBrowser(): Promise<Browser> {
+  async getBrowser(): Promise<puppeteer.Browser> {
     if (!this.browserInstance) {
-      console.log('启动新的浏览器实例...');
-      this.browserInstance = await puppeteer.launch(DEFAULT_BROWSER_CONFIG);
-      console.log('浏览器实例启动成功');
+      console.log('启动浏览器...');
+      this.browserInstance = await puppeteer.launch(DEFAULT_BROWSER_CONFIG as puppeteer.LaunchOptions);
+      this.active = true;
     }
     this.lastActivity = Date.now();
     return this.browserInstance;
+  }
+
+  async add(fn: () => Promise<Uint8Array>): Promise<Uint8Array> {
+    return new Promise<Uint8Array>((resolve, reject) => {
+      const task: QueueTask<Uint8Array> = {
+        fn,
+        resolve,
+        reject
+      };
+      
+      this.queue.push(task);
+      this.processQueue();
+    });
+  }
+
+  private async processQueue() {
+    if (this.processing >= this.maxConcurrentJobs || this.queue.length === 0) {
+      return;
+    }
+
+    this.processing += 1;
+    const task = this.queue.shift();
+
+    try {
+      const result = await task!.fn();
+      task!.resolve(result);
+    } catch (error) {
+      task!.reject(error);
+    } finally {
+      this.processing -= 1;
+      this.lastActivity = Date.now();
+      this.processQueue();
+    }
+  }
+
+  getStatus(): StatusResponse {
+    return {
+      queueLength: this.queue.length,
+      processing: this.processing,
+      maxConcurrentJobs: this.maxConcurrentJobs,
+      browserActive: this.active,
+      lastActivity: new Date(this.lastActivity).toISOString()
+    };
   }
 
   startBrowserMonitor(): void {
@@ -68,42 +113,6 @@ class ScreenshotQueue {
         this.browserInstance = null;
       }
     }, 60000);
-  }
-
-  async add(task: () => Promise<Buffer>): Promise<Buffer> {
-    return new Promise((resolve, reject) => {
-      this.queue.push({ task, resolve, reject });
-      this.processQueue();
-    });
-  }
-
-  private async processQueue(): Promise<void> {
-    if (this.processing >= this.maxConcurrent || this.queue.length === 0) {
-      return;
-    }
-
-    this.processing++;
-    const { task, resolve, reject } = this.queue.shift()!;
-
-    try {
-      const result = await task();
-      resolve(result);
-    } catch (error) {
-      reject(error);
-    } finally {
-      this.processing--;
-      this.processQueue();
-    }
-  }
-
-  getStatus(): StatusResponse {
-    return {
-      queueLength: this.queue.length,
-      processingJobs: this.processing,
-      maxConcurrentJobs: this.maxConcurrent,
-      browserActive: !!this.browserInstance,
-      lastActivity: this.lastActivity
-    };
   }
 }
 
@@ -129,7 +138,7 @@ app.post('/screenshot/url', async (req: Request<Record<string, never>, unknown, 
 
   try {
     const screenshot = await screenshotQueue.add(async () => {
-      let page: Page | null = null;
+      let page: puppeteer.Page | null = null;
       try {
         console.log(`开始处理 URL 截图请求: ${url}`);
         const browser = await screenshotQueue.getBrowser();
@@ -139,11 +148,13 @@ app.post('/screenshot/url', async (req: Request<Record<string, never>, unknown, 
         console.log('新页面创建成功');
         
         // 设置视口大小
-        await page.setViewport({
-          width: width || DEFAULT_PAGE_CONFIG.width,
-          height: height || DEFAULT_PAGE_CONFIG.height
-        });
-        console.log('视口设置完成');
+        if (page) {
+          await page.setViewport({
+            width: width || DEFAULT_PAGE_CONFIG.width,
+            height: height || DEFAULT_PAGE_CONFIG.height
+          });
+          console.log('视口设置完成');
+        }
 
         // 设置超时时间
         const pageTimeout = timeout || DEFAULT_PAGE_CONFIG.timeout;
@@ -171,19 +182,22 @@ app.post('/screenshot/url', async (req: Request<Record<string, never>, unknown, 
         // 等待额外时间，确保页面完全渲染
         if (waitFor && waitFor > 0) {
           console.log(`等待额外时间: ${waitFor}ms`);
-          await page.waitForTimeout(waitFor);
+          await setTimeout(waitFor);
         }
 
-        // 截图
+        // 获取截图元素
+        const element = selector ? await page.$(selector) : page;
+        if (!element) {
+          throw new Error('无法找到指定的元素');
+        }
+
+        // 根据选项进行截图
         console.log('开始截图...');
         const screenshotOptions: ScreenshotOptions = {
-          fullPage: true,
-          ...options
+          ...options,
+          encoding: 'binary'
         };
-        const screenshot = await page.screenshot(screenshotOptions);
-        console.log('截图完成');
-
-        return screenshot as Buffer;
+        return await element.screenshot(screenshotOptions as puppeteer.ScreenshotOptions);
       } finally {
         if (page) {
           await page.close();
@@ -207,7 +221,7 @@ app.post('/screenshot/url', async (req: Request<Record<string, never>, unknown, 
 app.get('/screenshot', async (_req: Request, res: Response) => {
   try {
     const screenshot = await screenshotQueue.add(async () => {
-      let page: Page | null = null;
+      let page: puppeteer.Page | null = null;
       try {
         console.log('开始 Cesium 截图流程...');
         const browser = await screenshotQueue.getBrowser();
@@ -217,11 +231,13 @@ app.get('/screenshot', async (_req: Request, res: Response) => {
         console.log('新页面创建成功');
         
         // 设置视口大小
-        await page.setViewport({
-          width: DEFAULT_PAGE_CONFIG.width,
-          height: DEFAULT_PAGE_CONFIG.height
-        });
-        console.log('视口设置完成');
+        if (page) {
+          await page.setViewport({
+            width: DEFAULT_PAGE_CONFIG.width,
+            height: DEFAULT_PAGE_CONFIG.height
+          });
+          console.log('视口设置完成');
+        }
 
         // 设置超时时间
         page.setDefaultNavigationTimeout(DEFAULT_PAGE_CONFIG.navigationTimeout);
@@ -229,7 +245,7 @@ app.get('/screenshot', async (_req: Request, res: Response) => {
 
         // 加载包含 Cesium 的页面
         console.log('开始加载页面...');
-        await page.goto(`http://localhost:${port}/index.html`, {
+        await page.goto(`http://localhost:${port}/cesium.html`, {
           waitUntil: 'networkidle0'
         });
         console.log('页面加载完成');
@@ -242,18 +258,15 @@ app.get('/screenshot', async (_req: Request, res: Response) => {
         console.log('Cesium 场景加载完成');
 
         // 等待一段时间确保场景完全渲染
-        await page.waitForTimeout(5000);
+        await setTimeout(5000);
         console.log('等待额外渲染时间完成');
 
         // 截图
         console.log('开始截图...');
-        const screenshot = await page.screenshot({
-          type: 'png',
-          fullPage: true
-        });
-        console.log('截图完成');
-
-        return screenshot as Buffer;
+        return await page.screenshot({
+          fullPage: true,
+          encoding: 'binary'
+        } as puppeteer.ScreenshotOptions);
       } finally {
         if (page) {
           await page.close();
@@ -339,10 +352,12 @@ app.post('/screenshot/geo', async (req: Request<Record<string, never>, unknown, 
       const browser = await screenshotQueue.getBrowser();
       const page = await browser.newPage();
       try {
-        await page.setViewport({
-          width: requestOptions.width || DEFAULT_PAGE_CONFIG.width,
-          height: requestOptions.height || DEFAULT_PAGE_CONFIG.height
-        });
+        if (page) {
+          await page.setViewport({
+            width: requestOptions.width || DEFAULT_PAGE_CONFIG.width,
+            height: requestOptions.height || DEFAULT_PAGE_CONFIG.height
+          });
+        }
 
         await page.goto(requestOptions.url, {
           waitUntil: 'networkidle0',
@@ -350,7 +365,7 @@ app.post('/screenshot/geo', async (req: Request<Record<string, never>, unknown, 
         });
 
         if (requestOptions.waitFor) {
-          await page.waitForTimeout(requestOptions.waitFor);
+          await setTimeout(requestOptions.waitFor);
         }
 
         if (requestOptions.selector) {
@@ -370,7 +385,7 @@ app.post('/screenshot/geo', async (req: Request<Record<string, never>, unknown, 
           encoding: 'binary'
         };
 
-        return await element.screenshot(screenshotOptions);
+        return await element.screenshot(screenshotOptions as puppeteer.ScreenshotOptions);
       } finally {
         await page.close();
       }
