@@ -30,4 +30,11 @@ Thumbs.db
 # Project specific
 screenshot.png
 resources/google-chrome-stable.deb
-resources/Cesium-1.111.zip 
+resources/Cesium-1.111.zip
+
+# Chrome浏览器相关文件
+*.exe
+*.dmg
+*.pkg
+*.deb
+*.rpm
