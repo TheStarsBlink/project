@@ -51,4 +51,25 @@ export interface PageConfig {
   height: number;
   timeout: number;
   navigationTimeout: number;
+}
+
+// 添加底图配置接口
+export interface BasemapConfig {
+  // 基本信息
+  name: string;
+  type: 'wmts' | 'wms' | 'xyz';
+  url: string;
+  
+  // 服务参数
+  params: {
+    // WMTS 参数
+    layer?: string;
+    style?: string;
+    format?: string;
+    tileMatrixSetID?: string;
+    maximumLevel?: number;
+    
+    // WMS 参数
+    transparent?: boolean;
+  };
 } 

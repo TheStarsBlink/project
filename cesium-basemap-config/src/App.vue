@@ -1,30 +1,29 @@
+<!--
+ * @Author: liwentao 132535285+TheStarsBlink@users.noreply.github.com
+ * @Date: 2025-03-24 22:48:33
+ * @LastEditors: liwentao 132535285+TheStarsBlink@users.noreply.github.com
+ * @LastEditTime: 2025-03-24 23:58:00
+ * @FilePath: \project\cesium-basemap-config\src\App.vue
+ * @Description: 
+ * 
+ * Copyright (c) 2025 by liwentao 132535285+TheStarsBlink@users.noreply.github.com, All Rights Reserved. 
+-->
 <script setup lang="ts">
-import HelloWorld from './components/HelloWorld.vue'
+// 无需导入任何组件
 </script>
 
 <template>
-  <div>
-    <a href="https://vite.dev" target="_blank">
-      <img src="/vite.svg" class="logo" alt="Vite logo" />
-    </a>
-    <a href="https://vuejs.org/" target="_blank">
-      <img src="./assets/vue.svg" class="logo vue" alt="Vue logo" />
-    </a>
-  </div>
-  <HelloWorld msg="Vite + Vue" />
+  <router-view></router-view>
 </template>
 
-<style scoped>
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.vue:hover {
-  filter: drop-shadow(0 0 2em #42b883aa);
+
+body {
+  font-family: Arial, sans-serif;
 }
 </style>

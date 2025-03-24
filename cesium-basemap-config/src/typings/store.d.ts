@@ -1,0 +1,1 @@
+/// <reference path="../stores/basemap.ts" /> 
