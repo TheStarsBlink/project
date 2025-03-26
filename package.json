@@ -11,7 +11,9 @@
   "dependencies": {
     "@types/cors": "^2.8.17",
     "cesium": "^1.111.3",
-    "cors": "^2.8.5"
+    "cors": "^2.8.5",
+    "sqlite": "5.1.1",
+    "sqlite3": "5.1.7"
   },
   "devDependencies": {
     "@types/cesium": "^1.70.4"

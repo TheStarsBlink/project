@@ -1,4 +1,6 @@
 import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import type { BasemapConfig } from '../../../src/types'
 
 // 定义底图配置类型
 export interface BasemapConfig {
@@ -33,71 +35,177 @@ const defaultConfig: BasemapConfig = {
   name: '新底图'
 }
 
-export const useBasemapStore = defineStore('basemap', {
-  state: (): BasemapState => {
-    // 从 localStorage 获取配置
-    const savedCurrentConfig = localStorage.getItem('basemap-current-config')
-    const savedConfigs = localStorage.getItem('basemap-saved-configs')
+export const useBasemapStore = defineStore('basemap', () => {
+  // 状态
+  const currentConfig = ref<BasemapConfig | null>(null)
+  const savedConfigs = ref<BasemapConfig[]>([])
+  const loading = ref(false)
+  const error = ref<string | null>(null)
+  
+  // API基础URL
+  const apiBaseUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000'
+  
+  // 计算属性
+  const configsByType = computed(() => {
+    const result: Record<string, BasemapConfig[]> = {
+      wmts: [],
+      wms: [],
+      xyz: []
+    }
     
+    savedConfigs.value.forEach(config => {
+      if (config.type in result) {
+        result[config.type].push(config)
+      }
+    })
+    
+    return result
+  })
+  
+  // 方法
+  // 获取所有底图配置
+  async function fetchAllConfigs() {
+    loading.value = true
+    error.value = null
+    
+    try {
+      const response = await fetch(`${apiBaseUrl}/basemap`)
+      if (!response.ok) throw new Error(`获取底图配置失败：HTTP ${response.status}`)
+      
+      savedConfigs.value = await response.json()
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : String(err)
+      console.error('获取底图配置失败:', err)
+    } finally {
+      loading.value = false
+    }
+  }
+  
+  // 获取指定名称的底图配置
+  async function fetchConfig(name: string) {
+    loading.value = true
+    error.value = null
+    
+    try {
+      const response = await fetch(`${apiBaseUrl}/basemap/${encodeURIComponent(name)}`)
+      if (!response.ok) {
+        if (response.status === 404) {
+          error.value = '未找到指定的底图配置'
+          currentConfig.value = null
+          return null
+        }
+        throw new Error(`获取底图配置失败：HTTP ${response.status}`)
+      }
+      
+      const config = await response.json()
+      currentConfig.value = config
+      return config
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : String(err)
+      console.error('获取底图配置失败:', err)
+      return null
+    } finally {
+      loading.value = false
+    }
+  }
+  
+  // 保存底图配置
+  async function saveConfig(config: BasemapConfig) {
+    loading.value = true
+    error.value = null
+    
+    try {
+      const response = await fetch(`${apiBaseUrl}/basemap`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(config)
+      })
+      
+      if (!response.ok) throw new Error(`保存底图配置失败：HTTP ${response.status}`)
+      
+      // 保存成功后刷新列表
+      await fetchAllConfigs()
+      currentConfig.value = config
+      return await response.json()
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : String(err)
+      console.error('保存底图配置失败:', err)
+      return null
+    } finally {
+      loading.value = false
+    }
+  }
+  
+  // 删除底图配置
+  async function deleteConfig(name: string) {
+    loading.value = true
+    error.value = null
+    
+    try {
+      const response = await fetch(`${apiBaseUrl}/basemap/${encodeURIComponent(name)}`, {
+        method: 'DELETE'
+      })
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          error.value = '未找到指定的底图配置'
+          return false
+        }
+        throw new Error(`删除底图配置失败：HTTP ${response.status}`)
+      }
+      
+      // 删除成功后刷新列表
+      await fetchAllConfigs()
+      if (currentConfig.value?.name === name) {
+        currentConfig.value = null
+      }
+      return true
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : String(err)
+      console.error('删除底图配置失败:', err)
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+  
+  // 设置当前底图配置（不保存到服务器）
+  function setCurrentConfig(config: BasemapConfig | null) {
+    currentConfig.value = config
+  }
+  
+  // 创建新的配置
+  function createNewConfig(): BasemapConfig {
     return {
-      currentConfig: savedCurrentConfig ? JSON.parse(savedCurrentConfig) : {...defaultConfig},
-      savedConfigs: savedConfigs ? JSON.parse(savedConfigs) : []
+      name: '',
+      type: 'wmts',
+      url: '',
+      params: {}
     }
-  },
+  }
   
-  actions: {
-    // 更新当前配置
-    updateCurrentConfig(config: Partial<BasemapConfig>) {
-      this.currentConfig = { ...this.currentConfig, ...config }
-      this.saveToLocalStorage()
-    },
-    
-    // 保存当前配置到配置列表
-    saveCurrentConfig(name?: string) {
-      if (name) {
-        this.currentConfig.name = name
-      }
-      
-      // 检查是否已存在同名配置，如果存在则更新
-      const existingIndex = this.savedConfigs.findIndex(
-        config => config.name === this.currentConfig.name
-      )
-      
-      if (existingIndex >= 0) {
-        this.savedConfigs[existingIndex] = { ...this.currentConfig }
-      } else {
-        this.savedConfigs.push({ ...this.currentConfig })
-      }
-      
-      this.saveToLocalStorage()
-    },
-    
-    // 加载已保存的配置
-    loadConfig(index: number) {
-      if (index >= 0 && index < this.savedConfigs.length) {
-        this.currentConfig = { ...this.savedConfigs[index] }
-        this.saveToLocalStorage()
-      }
-    },
-    
-    // 删除保存的配置
-    deleteConfig(index: number) {
-      if (index >= 0 && index < this.savedConfigs.length) {
-        this.savedConfigs.splice(index, 1)
-        this.saveToLocalStorage()
-      }
-    },
-    
-    // 保存到 localStorage
-    saveToLocalStorage() {
-      localStorage.setItem('basemap-current-config', JSON.stringify(this.currentConfig))
-      localStorage.setItem('basemap-saved-configs', JSON.stringify(this.savedConfigs))
-    }
-  },
+  // 初始化
+  function init() {
+    fetchAllConfigs()
+  }
   
-  getters: {
-    // 获取 URL 和类型的快捷访问
-    url: state => state.currentConfig.url,
-    type: state => state.currentConfig.type
+  return {
+    // 状态
+    currentConfig,
+    savedConfigs,
+    loading,
+    error,
+    configsByType,
+    
+    // 方法
+    fetchAllConfigs,
+    fetchConfig,
+    saveConfig,
+    deleteConfig,
+    setCurrentConfig,
+    createNewConfig,
+    init
   }
 }) 

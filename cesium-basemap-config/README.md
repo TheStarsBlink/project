@@ -60,6 +60,49 @@ pnpm preview
 - 当前正在编辑的配置
 - 所有已保存的配置列表
 
+### 服务端持久化
+
+当使用"发送到服务器"功能时，底图配置会被发送到截图服务后端，并通过SQLite数据库持久化存储：
+
+1. **前端发送方式**：
+   ```typescript
+   // 通过API发送配置到服务器
+   async function saveToServer(config: BasemapConfig) {
+     try {
+       const response = await fetch(`${serverUrl}/basemap`, {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify(config)
+       });
+       return await response.json();
+     } catch (error) {
+       console.error('保存到服务器失败:', error);
+       throw error;
+     }
+   }
+   ```
+
+2. **服务端存储**：
+   - 数据通过SQLite数据库持久化存储在截图服务的`DATA_DIR`目录中
+   - 使用`basemaps.db`数据库文件
+   - 数据以JSON格式序列化后存储
+   - 支持按名称或类型查询
+
+3. **配置同步**：
+   - 可以从服务器加载保存的配置到前端工具中
+   - 支持将本地配置批量发送到服务器
+   - 服务器配置优先级高于本地配置
+
+### 加载服务器配置
+
+使用以下接口从服务器获取配置：
+
+```
+GET http://localhost:3000/basemap
+GET http://localhost:3000/basemap/配置名称
+GET http://localhost:3000/basemap/type/wmts
+```
+
 ## 与截图服务集成
 
 本工具可以与 Cesium 截图服务集成，允许用户将配置好的底图服务发送到截图服务器。
@@ -79,3 +122,22 @@ GET http://localhost:3000/screenshot?basemapName=配置名称
 ```
 
 响应将是一个 PNG 格式的图片。
+
+### 内网部署注意事项
+
+在内网环境部署时：
+
+1. **服务器地址配置**：
+   - 修改`.env`文件中的`VITE_SERVER_URL`环境变量为内网服务器地址
+   - 或在Docker运行时通过环境变量覆盖：
+     ```bash
+     docker run -p 8080:80 -e VITE_SERVER_URL=http://内网IP:3000 cesium-basemap-config
+     ```
+
+2. **数据备份**：
+   - 尽管前端有localStorage存储，但关键配置应定期从服务器备份
+   - 参考主项目文档中的SQLite数据库备份方法
+
+3. **权限设置**：
+   - 在生产环境中，可能需要配置适当的访问权限控制
+   - 当前版本不包含用户认证功能，如需要请自行扩展
