@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# 获取提交信息
+COMMIT_MSG=$(git log -1 HEAD --pretty=format:"%h - %an, %ar : %s")
+COMMIT_DATE=$(date '+%Y-%m-%d %H:%M:%S')
+
+# 创建日志目录（如果不存在）
+mkdir -p .git/logs
+
+# 将提交信息写入日志文件
+echo "[$COMMIT_DATE] $COMMIT_MSG" >> .git/logs/commit.log
+
+# 打印提交信息到控制台
+echo "提交已记录到日志文件: .git/logs/commit.log" 
