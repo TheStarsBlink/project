@@ -1,0 +1,116 @@
+<template>
+  <div class="home">
+    <h1>截图服务</h1>
+    
+    <div class="card">
+      <h2>欢迎使用截图服务</h2>
+      <p>这是一个功能强大的网页截图服务，支持多种截图方式和功能。</p>
+      
+      <h3>功能列表</h3>
+      <ul class="feature-list">
+        <li>单次URL截图</li>
+        <li>Cesium地图截图</li>
+        <li>地理数据可视化截图</li>
+        <li><strong>定期自动截图</strong> (新功能!)</li>
+      </ul>
+      
+      <router-link to="/scheduled" class="btn">进入定期截图管理</router-link>
+      <router-link to="/" class="btn">底图配置管理</router-link>
+    </div>
+    
+    <div class="card">
+      <h2>API状态</h2>
+      <p>当前服务器状态:</p>
+      <pre id="status">{{ statusData ? JSON.stringify(statusData, null, 2) : '加载中...' }}</pre>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted } from 'vue';
+
+const statusData = ref<any>(null);
+const API_ENDPOINT = import.meta.env.VITE_API_ENDPOINT || '';
+
+const loadStatus = async () => {
+  try {
+    const response = await fetch(`${API_ENDPOINT}/status`);
+    statusData.value = await response.json();
+  } catch (error) {
+    console.error('获取状态失败:', error);
+    statusData.value = { error: '获取状态失败' };
+  }
+};
+
+onMounted(() => {
+  loadStatus();
+});
+</script>
+
+<style scoped>
+.home {
+  font-family: 'Arial', sans-serif;
+  line-height: 1.6;
+  padding: 20px;
+  color: #333;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+h1 {
+  color: #2c3e50;
+  border-bottom: 2px solid #eee;
+  padding-bottom: 10px;
+}
+
+.card {
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  padding: 20px;
+  margin-bottom: 20px;
+  background-color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.btn {
+  display: inline-block;
+  background-color: #3498db;
+  color: white;
+  text-decoration: none;
+  padding: 10px 15px;
+  border-radius: 4px;
+  font-size: 16px;
+  margin-top: 10px;
+  margin-right: 10px;
+}
+
+.btn:hover {
+  background-color: #2980b9;
+}
+
+.feature-list {
+  list-style-type: none;
+  padding-left: 0;
+}
+
+.feature-list li {
+  margin-bottom: 10px;
+  padding-left: 25px;
+  position: relative;
+}
+
+.feature-list li:before {
+  content: "✓";
+  color: #2ecc71;
+  position: absolute;
+  left: 0;
+  font-weight: bold;
+}
+
+pre {
+  background-color: #f5f5f5;
+  padding: 15px;
+  border-radius: 5px;
+  overflow-x: auto;
+}
+</style> 

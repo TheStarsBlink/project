@@ -6,6 +6,8 @@ import { ScreenshotQueue, DEFAULT_BROWSER_CONFIG } from './services/queue';
 import { setupScreenshotRoutes } from './services/screenshot';
 import { BasemapDatabase } from './services/basemap-db';
 import { setupBasemapRoutes } from './services/basemap-api';
+import { ScreenshotScheduler } from './services/scheduler';
+import { setupSchedulerRoutes } from './services/scheduler-api';
 
 // 设置环境变量和服务器配置
 const app = express();
@@ -29,8 +31,11 @@ basemapDb.init().catch(err => {
   process.exit(1);
 });
 
+// 初始化定期截图调度器
+const screenshotScheduler = new ScreenshotScheduler(screenshotQueue);
+
 // 中间件
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, '../public')));
 app.use(express.json());
 app.use(cors());
 
@@ -44,6 +49,9 @@ setupScreenshotRoutes(app, screenshotQueue, port);
 
 // 设置底图配置路由
 setupBasemapRoutes(app, basemapDb);
+
+// 设置定期截图路由
+setupSchedulerRoutes(app, screenshotScheduler, DATA_DIR);
 
 // 启动服务器
 app.listen(port, () => {

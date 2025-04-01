@@ -12,7 +12,7 @@ import {
   PageConfig
 } from '../types';
 import { ScreenshotQueue } from './queue';
-import { GeoDataProcessor, GeoDataOptions } from '../utils/geoData';
+import { GeoDataProcessor, GeoDataOptions } from '../utils/geoData-simple';
 
 // 默认页面配置
 const DEFAULT_PAGE_CONFIG: PageConfig = {
@@ -309,40 +309,39 @@ function handleGeoScreenshot(screenshotQueue: ScreenshotQueue, port: number | st
       if (!fs.existsSync(filePath)) {
         return res.status(404).send('文件不存在');
       }
-  
-      // 根据文件扩展名选择处理方法
-      const ext = path.extname(filePath).toLowerCase();
+
+      // 使用简化版处理器处理文件
+      const processor = new GeoDataProcessor();
       let geoData;
-      switch (ext) {
-        case '.json':
-        case '.geojson':
-          geoData = await GeoDataProcessor.readGeoJSON(filePath);
-          break;
-        case '.shp':
-          geoData = await GeoDataProcessor.readSHP(filePath);
-          break;
-        case '.kml':
-          geoData = await GeoDataProcessor.readKML(filePath);
-          break;
-        case '.gml':
-          geoData = await GeoDataProcessor.readGML(filePath);
-          break;
-        case '.topojson':
-          geoData = await GeoDataProcessor.readTopoJSON(filePath);
-          break;
-        case '.csv':
-          if (!options?.csvOptions?.longitudeColumn || !options?.csvOptions?.latitudeColumn) {
-            return res.status(400).send('CSV 文件需要指定经度和纬度列名');
-          }
-          geoData = await GeoDataProcessor.readCSV(filePath, options.csvOptions);
-          break;
-        default:
-          return res.status(400).send('不支持的文件格式');
+      try {
+        geoData = await processor.processFile(filePath, options);
+      } catch (error) {
+        return res.status(400).send(`文件处理失败: ${error instanceof Error ? error.message : '未知错误'}`);
       }
-  
-      // 生成 Cesium 场景配置
-      const html = GeoDataProcessor.generateCesiumConfig(geoData, options);
-  
+      
+      // 创建简单的HTML以显示数据
+      const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>GeoJSON Viewer</title>
+  <style>
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; }
+    #map { width: 100%; height: 100%; }
+    pre { padding: 10px; background: #f5f5f5; overflow: auto; max-height: 500px; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script>
+    const geoData = ${JSON.stringify(geoData)};
+    console.log('GeoData loaded:', geoData);
+    document.getElementById('map').innerHTML = '<pre>' + JSON.stringify(geoData, null, 2) + '</pre>';
+  </script>
+</body>
+</html>`;
+
       // 创建临时 HTML 文件
       const tempHtmlPath = path.join(__dirname, '../../public/temp.html');
       await fs.promises.writeFile(tempHtmlPath, html);
@@ -350,9 +349,9 @@ function handleGeoScreenshot(screenshotQueue: ScreenshotQueue, port: number | st
       // 使用现有的截图队列处理截图
       const requestOptions: ScreenshotRequest = {
         url: `http://localhost:${port}/temp.html`,
-        width: typeof options?.width === 'number' ? options.width : 1920,
-        height: typeof options?.height === 'number' ? options.height : 1080,
-        waitFor: 2000, // 等待地图加载
+        width: 1920,
+        height: 1080,
+        waitFor: 1000,
         options: {
           fullPage: true
         }

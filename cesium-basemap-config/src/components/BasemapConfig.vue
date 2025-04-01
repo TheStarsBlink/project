@@ -1,5 +1,10 @@
 <template>
   <div class="basemap-config">
+    <div class="nav-bar">
+      <router-link to="/dashboard" class="nav-btn">服务首页</router-link>
+      <router-link to="/scheduled" class="nav-btn">定期截图管理</router-link>
+    </div>
+    
     <div class="config-form">
       <h2>底图服务配置</h2>
       
@@ -146,52 +151,150 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted, watch } from 'vue'
-import * as Cesium from 'cesium'
-import 'cesium/Build/Cesium/Widgets/widgets.css'
+// 不再导入Cesium，使用全局对象
 import { useBasemapStore } from '../stores/basemap'
 import type { BasemapConfig } from '../stores/basemap'
 
+// 声明全局Cesium类型以避免TypeScript错误
+declare global {
+  interface Window {
+    Cesium: any;
+  }
+}
+
 const store = useBasemapStore()
 
-// 响应式引用基本参数
-const basemapUrl = ref(store.currentConfig.url)
-const basemapType = ref(store.currentConfig.type)
-const configName = ref(store.currentConfig.name)
+// 初始化默认配置
+const defaultConfig: BasemapConfig = {
+  url: '',
+  type: 'wmts',
+  name: '新底图',
+  layer: 'default',
+  style: 'default',
+  format: 'tiles',
+  tileMatrixSetID: 'default',
+  maximumLevel: 18,
+  transparent: true
+}
+
+// 确保currentConfig不为null
+if (store.currentConfig === null) {
+  store.setCurrentConfig(defaultConfig)
+}
+
+// 响应式引用基本参数 - 使用可选链和默认值防止null错误
+const basemapUrl = ref(store.currentConfig?.url || '')
+const basemapType = ref(store.currentConfig?.type || 'wmts')
+const configName = ref(store.currentConfig?.name || '新底图')
 
 // WMTS 参数
 const wmtsParams = reactive({
-  layer: store.currentConfig.layer || 'default',
-  style: store.currentConfig.style || 'default',
-  format: store.currentConfig.format || 'tiles',
-  tileMatrixSetID: store.currentConfig.tileMatrixSetID || 'default',
-  maximumLevel: store.currentConfig.maximumLevel || 18
+  layer: store.currentConfig?.layer || 'default',
+  style: store.currentConfig?.style || 'default',
+  format: store.currentConfig?.format || 'tiles',
+  tileMatrixSetID: store.currentConfig?.tileMatrixSetID || 'default',
+  maximumLevel: store.currentConfig?.maximumLevel || 18
 })
 
 // WMS 参数
 const wmsParams = reactive({
-  layer: store.currentConfig.layer || 'default',
-  format: store.currentConfig.format || 'image/png',
-  transparent: store.currentConfig.transparent !== undefined ? store.currentConfig.transparent : true
+  layer: store.currentConfig?.layer || 'default',
+  format: store.currentConfig?.format || 'image/png',
+  transparent: store.currentConfig?.transparent !== undefined ? store.currentConfig.transparent : true
 })
 
-let viewer: Cesium.Viewer | null = null
+let viewer: any = null
+// 使用全局Cesium
+const Cesium = window.Cesium
 
-const initCesium = async () => {
-  viewer = new Cesium.Viewer('cesiumContainer', {
-    animation: false,
-    baseLayerPicker: false,
-    fullscreenButton: false,
-    geocoder: false,
-    homeButton: false,
-    navigationHelpButton: false,
-    sceneModePicker: false,
-    timeline: false
-  })
+// 初始化Cesium
+const initCesium = () => {
+  try {
+    console.log('初始化Cesium...');
+    
+    // 确保元素存在
+    const container = document.getElementById('cesiumContainer');
+    if (!container) {
+      console.error('找不到cesiumContainer元素');
+      return null;
+    }
+    
+    // 设置容器样式以确保全屏显示
+    container.style.width = '100%';
+    container.style.height = '100%';
+    container.style.margin = '0';
+    container.style.padding = '0';
+    container.style.overflow = 'hidden';
+    
+    // 使用正确的CDN路径
+    window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.111.0/Build/Cesium/';
+    
+    // 使用最小配置，并禁用各种可能导致错误的功能
+    viewer = new Cesium.Viewer('cesiumContainer', {
+      animation: false,
+      baseLayerPicker: false,
+      fullscreenButton: false,
+      geocoder: false,
+      homeButton: false,
+      navigationHelpButton: false,
+      sceneModePicker: false,
+      timeline: false,
+      selectionIndicator: false,
+      infoBox: false,
+      // 不使用默认底图提供者
+      imageryProvider: false,
+      // 禁用地形
+      terrainProvider: undefined
+    });
+    
+    // 设置场景相机视角
+    viewer.camera.setView({
+      destination: Cesium.Cartesian3.fromDegrees(0, 0, 20000000)
+    });
+    
+    // 禁用各种可能导致错误的功能
+    if (viewer.scene) {
+      viewer.scene.sun = undefined;
+      viewer.scene.moon = undefined;
+      viewer.scene.skyBox = undefined;
+      viewer.scene.skyAtmosphere = undefined;
+      viewer.scene.globe.showGroundAtmosphere = false;
+    
+      // 禁用抗锯齿以提高性能
+      viewer.scene.postProcessStages.fxaa.enabled = false;
+    
+      // 禁用深度测试，避免某些渲染问题
+      viewer.scene.globe.depthTestAgainstTerrain = false;
+    }
+    
+    // 添加一个简单的默认底图 - 使用正确的模板格式
+    try {
+      const osmProvider = new Cesium.UrlTemplateImageryProvider({
+        url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        maximumLevel: 19
+      });
+      viewer.imageryLayers.addImageryProvider(osmProvider);
+    } catch (e) {
+      console.error('默认底图加载失败:', e);
+    }
+    
+    // 禁用导航说明
+    if (viewer.cesiumWidget && viewer.cesiumWidget.screenSpaceEventHandler) {
+      viewer.cesiumWidget.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
+      viewer.cesiumWidget.screenSpaceEventHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK);
+    }
+    
+    console.log('Cesium初始化成功');
+    return viewer;
+  } catch (error) {
+    console.error('Cesium初始化失败:', error);
+    return null;
+  }
 }
 
 const updateBasemap = () => {
-  if (!viewer || !basemapUrl.value) return
-
+  if (!viewer) return
+  
   // 根据底图类型更新配置
   const configUpdate: Partial<BasemapConfig> = {
     url: basemapUrl.value,
@@ -223,44 +326,118 @@ const updateBasemap = () => {
   updateCesiumBasemap()
 }
 
+// 更简化的底图更新函数
 const updateCesiumBasemap = () => {
-  if (!viewer) return
+  if (!viewer) return;
 
-  viewer.imageryLayers.removeAll()
-  
-  let imageryProvider: any
-  
-  switch (basemapType.value) {
-    case 'wmts':
-      imageryProvider = new Cesium.WebMapTileServiceImageryProvider({
-        url: basemapUrl.value,
-        layer: wmtsParams.layer,
-        style: wmtsParams.style,
-        format: wmtsParams.format,
-        tileMatrixSetID: wmtsParams.tileMatrixSetID,
-        maximumLevel: wmtsParams.maximumLevel
-      })
-      break
-    case 'wms':
-      imageryProvider = new Cesium.WebMapServiceImageryProvider({
-        url: basemapUrl.value,
-        layers: wmsParams.layer,
-        parameters: {
-          format: wmsParams.format,
-          transparent: wmsParams.transparent
+  try {
+    // 清除现有图层
+    viewer.imageryLayers.removeAll();
+    
+    // 如果URL为空，使用默认底图
+    if (!basemapUrl.value) {
+      console.log('使用默认底图');
+      
+      try {
+        // 使用OpenStreetMap作为默认底图
+        const osmProvider = new Cesium.UrlTemplateImageryProvider({
+          url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          maximumLevel: 19
+        });
+        viewer.imageryLayers.addImageryProvider(osmProvider);
+      } catch (e) {
+        console.error('默认底图加载失败:', e);
+      }
+      
+      return;
+    }
+    
+    // 根据类型加载底图
+    let imageryProvider;
+    
+    switch (basemapType.value) {
+      case 'wmts':
+        try {
+          imageryProvider = new Cesium.WebMapTileServiceImageryProvider({
+            url: basemapUrl.value,
+            layer: wmtsParams.layer,
+            style: wmtsParams.style,
+            format: wmtsParams.format,
+            tileMatrixSetID: wmtsParams.tileMatrixSetID,
+            maximumLevel: wmtsParams.maximumLevel
+          });
+          viewer.imageryLayers.addImageryProvider(imageryProvider);
+        } catch (e) {
+          console.error('WMTS底图加载失败:', e);
+          // 使用OSM作为默认底图
+          const osmProvider = new Cesium.UrlTemplateImageryProvider({
+            url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            maximumLevel: 19
+          });
+          viewer.imageryLayers.addImageryProvider(osmProvider);
         }
-      })
-      break
-    case 'xyz':
-      imageryProvider = new Cesium.UrlTemplateImageryProvider({
-        url: basemapUrl.value
-      })
-      break
-    default:
-      return
+        break;
+      case 'wms':
+        try {
+          imageryProvider = new Cesium.WebMapServiceImageryProvider({
+            url: basemapUrl.value,
+            layers: wmsParams.layer,
+            parameters: {
+              format: wmsParams.format,
+              transparent: wmsParams.transparent
+            }
+          });
+          viewer.imageryLayers.addImageryProvider(imageryProvider);
+        } catch (e) {
+          console.error('WMS底图加载失败:', e);
+          // 使用OSM作为默认底图
+          const osmProvider = new Cesium.UrlTemplateImageryProvider({
+            url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            maximumLevel: 19
+          });
+          viewer.imageryLayers.addImageryProvider(osmProvider);
+        }
+        break;
+      case 'xyz':
+        try {
+          // 对于XYZ，我们使用UrlTemplateImageryProvider
+          imageryProvider = new Cesium.UrlTemplateImageryProvider({
+            url: basemapUrl.value
+          });
+          viewer.imageryLayers.addImageryProvider(imageryProvider);
+        } catch (e) {
+          console.error('XYZ底图加载失败:', e);
+          // 使用OSM作为默认底图
+          const osmProvider = new Cesium.UrlTemplateImageryProvider({
+            url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            maximumLevel: 19
+          });
+          viewer.imageryLayers.addImageryProvider(osmProvider);
+        }
+        break;
+      default:
+        // 添加OSM作为默认底图
+        const osmProvider = new Cesium.UrlTemplateImageryProvider({
+          url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          maximumLevel: 19
+        });
+        viewer.imageryLayers.addImageryProvider(osmProvider);
+        return;
+    }
+  } catch (error) {
+    console.error('底图加载失败:', error);
+    // 加载备用底图
+    try {
+      // 使用OSM作为备用底图
+      const backupProvider = new Cesium.UrlTemplateImageryProvider({
+        url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        maximumLevel: 19
+      });
+      viewer.imageryLayers.addImageryProvider(backupProvider);
+    } catch (e) {
+      console.error('备用底图加载失败:', e);
+    }
   }
-
-  viewer.imageryLayers.addImageryProvider(imageryProvider)
 }
 
 // 保存当前配置
@@ -273,10 +450,10 @@ const loadConfig = (index: number) => {
   store.loadConfig(index)
   
   // 更新本地响应式状态
-  const config = store.currentConfig
-  basemapUrl.value = config.url
-  basemapType.value = config.type
-  configName.value = config.name
+  const config = store.currentConfig || defaultConfig
+  basemapUrl.value = config.url || ''
+  basemapType.value = config.type || 'wmts'
+  configName.value = config.name || '新底图'
   
   if (config.type === 'wmts') {
     wmtsParams.layer = config.layer || 'default'
@@ -301,9 +478,11 @@ const deleteConfig = (index: number) => {
 
 // 监听 store 变化
 watch(() => store.currentConfig, (newConfig) => {
-  basemapUrl.value = newConfig.url
-  basemapType.value = newConfig.type
-  configName.value = newConfig.name
+  if (!newConfig) return
+  
+  basemapUrl.value = newConfig.url || ''
+  basemapType.value = newConfig.type || 'wmts'
+  configName.value = newConfig.name || '新底图'
   
   if (newConfig.type === 'wmts') {
     wmtsParams.layer = newConfig.layer || 'default'
@@ -397,9 +576,19 @@ const sendToServer = async () => {
 }
 
 onMounted(() => {
-  initCesium()
-  if (basemapUrl.value) {
-    updateCesiumBasemap()
+  try {
+    // 初始化 store
+    store.init()
+    
+    // 初始化 Cesium
+    initCesium()
+    
+    // 如果URL存在，更新底图
+    if (basemapUrl.value) {
+      updateCesiumBasemap()
+    }
+  } catch (error) {
+    console.error('组件挂载失败:', error)
   }
 })
 
@@ -415,14 +604,68 @@ onUnmounted(() => {
 .basemap-config {
   display: flex;
   height: 100vh;
+  width: 100vw;
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.nav-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 10px;
+  background: #f5f5f5;
+  border-right: 1px solid #ddd;
+  z-index: 10;
+}
+
+.nav-btn {
+  display: block;
+  padding: 8px 16px;
+  background-color: #4285f4;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  margin-bottom: 10px;
+  text-decoration: none;
+  text-align: center;
+}
+
+.nav-btn:hover {
+  background-color: #3367d6;
 }
 
 .config-form {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 350px;
+  max-width: 30%;
+  height: 100%;
   padding: 20px;
-  background: #f5f5f5;
   border-right: 1px solid #ddd;
   overflow-y: auto;
+  background-color: white;
+  z-index: 5;
+  box-sizing: border-box;
+}
+
+.map-container {
+  position: absolute;
+  top: 0;
+  left: 350px;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  height: auto;
+  z-index: 1;
 }
 
 .form-section {
@@ -465,12 +708,14 @@ h3 {
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 14px;
+  box-sizing: border-box;
 }
 
 .button-group {
   display: flex;
   gap: 10px;
   margin: 20px 0;
+  flex-wrap: wrap;
 }
 
 .btn {
@@ -526,8 +771,32 @@ h3 {
   gap: 5px;
 }
 
-.map-container {
-  flex: 1;
-  height: 100%;
+/* 确保cesium容器占满div */
+#cesiumContainer {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+@media (max-width: 768px) {
+  .basemap-config {
+    flex-direction: column;
+  }
+  
+  .config-form {
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    height: 50%;
+    border-right: none;
+    border-bottom: 1px solid #ddd;
+  }
+  
+  .map-container {
+    position: relative;
+    top: auto;
+    left: auto;
+    width: 100%;
+    height: 50%;
+  }
 }
 </style> 

@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>定期截图管理</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      line-height: 1.6;
+      margin: 0;
+      padding: 20px;
+      color: #333;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #2c3e50;
+      border-bottom: 2px solid #eee;
+      padding-bottom: 10px;
+    }
+    form {
+      background: #f9f9f9;
+      padding: 20px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    input, select {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:hover {
+      background-color: #2980b9;
+    }
+    .card {
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      padding: 15px;
+      margin-bottom: 15px;
+      background-color: white;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    .task-controls {
+      display: flex;
+      gap: 10px;
+    }
+    .btn-stop {
+      background-color: #e74c3c;
+    }
+    .btn-stop:hover {
+      background-color: #c0392b;
+    }
+    .btn-restart {
+      background-color: #2ecc71;
+    }
+    .btn-restart:hover {
+      background-color: #27ae60;
+    }
+    .status-running {
+      color: #2ecc71;
+      font-weight: bold;
+    }
+    .status-stopped {
+      color: #e74c3c;
+      font-weight: bold;
+    }
+    #tasksList {
+      margin-top: 20px;
+    }
+    .screenshot-preview {
+      max-width: 300px;
+      max-height: 200px;
+      margin-top: 10px;
+      border: 1px solid #ddd;
+    }
+    .loading {
+      color: #3498db;
+      margin-top: 20px;
+      font-style: italic;
+    }
+    .examples-section {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #f0f7ff;
+      border-radius: 5px;
+      border: 1px solid #d0e3ff;
+    }
+    .example-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      margin-top: 15px;
+    }
+    .example-item {
+      background: white;
+      padding: 15px;
+      border-radius: 5px;
+      border: 1px solid #ddd;
+      width: calc(33.33% - 10px);
+      box-sizing: border-box;
+    }
+    .example-item h4 {
+      margin-top: 0;
+      color: #3498db;
+    }
+    .example-item p {
+      font-size: 14px;
+      color: #666;
+    }
+    .example-item button {
+      margin-top: 10px;
+      background-color: #f39c12;
+    }
+    .example-item button:hover {
+      background-color: #d35400;
+    }
+    .nav-bar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .nav-btn {
+      background-color: #7f8c8d;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      text-decoration: none;
+      font-size: 16px;
+    }
+    .nav-btn:hover {
+      background-color: #6c7a89;
+    }
+  </style>
+</head>
+<body>
+  <h1>定期截图管理</h1>
+  
+  <div class="nav-bar">
+    <a href="/home.html" class="nav-btn">返回首页</a>
+  </div>
+  
+  <form id="createTaskForm">
+    <h2>创建新任务</h2>
+    <div class="form-group">
+      <label for="url">页面URL:</label>
+      <input type="url" id="url" name="url" required placeholder="https://example.com">
+    </div>
+    
+    <div class="form-group">
+      <label for="interval">截图间隔 (毫秒):</label>
+      <input type="number" id="interval" name="interval" value="5000" min="1000" required>
+    </div>
+    
+    <div class="form-group">
+      <label for="width">宽度 (像素):</label>
+      <input type="number" id="width" name="width" value="1920">
+    </div>
+    
+    <div class="form-group">
+      <label for="height">高度 (像素):</label>
+      <input type="number" id="height" name="height" value="1080">
+    </div>
+    
+    <div class="form-group">
+      <label for="selector">CSS选择器 (可选):</label>
+      <input type="text" id="selector" name="selector" placeholder="#main-content">
+    </div>
+    
+    <div class="form-group">
+      <label for="maxScreenshots">最大截图数量:</label>
+      <input type="number" id="maxScreenshots" name="maxScreenshots" value="10" min="1">
+    </div>
+    
+    <button type="submit">创建任务</button>
+  </form>
+  
+  <div class="examples-section">
+    <h2>使用示例配置</h2>
+    <p>选择下列示例配置之一快速创建任务：</p>
+    <div class="example-list" id="examplesList">
+      <div class="loading">加载示例配置中...</div>
+    </div>
+  </div>
+  
+  <h2>任务列表</h2>
+  <button id="refreshTasks">刷新任务列表</button>
+  <div id="tasksList">
+    <p class="loading">加载中...</p>
+  </div>
+  
+  <script>
+    // 获取元素
+    const createTaskForm = document.getElementById('createTaskForm');
+    const tasksListContainer = document.getElementById('tasksList');
+    const refreshTasksButton = document.getElementById('refreshTasks');
+    const examplesListContainer = document.getElementById('examplesList');
+    
+    // 加载示例配置
+    async function loadExamples() {
+      try {
+        const response = await fetch('/data/example-config.json');
+        const data = await response.json();
+        
+        if (!data.examples || data.examples.length === 0) {
+          examplesListContainer.innerHTML = '<p>没有可用的示例配置</p>';
+          return;
+        }
+        
+        examplesListContainer.innerHTML = '';
+        data.examples.forEach(example => {
+          const exampleElement = document.createElement('div');
+          exampleElement.className = 'example-item';
+          exampleElement.innerHTML = `
+            <h4>${example.name}</h4>
+            <p>${example.description}</p>
+            <button onclick='loadExampleConfig(${JSON.stringify(example.config)})'>使用此配置</button>
+          `;
+          examplesListContainer.appendChild(exampleElement);
+        });
+      } catch (error) {
+        console.error('加载示例配置失败:', error);
+        examplesListContainer.innerHTML = `<p>加载示例配置失败: ${error.message}</p>`;
+      }
+    }
+    
+    // 加载示例配置到表单
+    function loadExampleConfig(config) {
+      document.getElementById('url').value = config.url || '';
+      document.getElementById('interval').value = config.interval || 5000;
+      document.getElementById('width').value = config.width || 1920;
+      document.getElementById('height').value = config.height || 1080;
+      document.getElementById('selector').value = config.selector || '';
+      document.getElementById('maxScreenshots').value = config.maxScreenshots || 10;
+      
+      // 滚动到表单
+      createTaskForm.scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    // 加载任务列表
+    async function loadTasks() {
+      tasksListContainer.innerHTML = '<p class="loading">加载中...</p>';
+      try {
+        const response = await fetch('/screenshot/scheduled');
+        const tasks = await response.json();
+        
+        if (tasks.length === 0) {
+          tasksListContainer.innerHTML = '<p>没有进行中的任务</p>';
+          return;
+        }
+        
+        tasksListContainer.innerHTML = '';
+        tasks.forEach(task => {
+          const taskCard = document.createElement('div');
+          taskCard.className = 'card';
+          
+          // 计算任务运行时间
+          const startTime = new Date(task.startTime);
+          const runningTime = Math.floor((new Date() - startTime) / 1000); // 秒
+          
+          taskCard.innerHTML = `
+            <h3>任务ID: ${task.id}</h3>
+            <p><strong>URL:</strong> ${task.url}</p>
+            <p><strong>截图间隔:</strong> ${task.interval}ms</p>
+            <p><strong>输出目录:</strong> ${task.outputDir}</p>
+            <p><strong>截图数量:</strong> ${task.screenshotCount}</p>
+            <p><strong>开始时间:</strong> ${startTime.toLocaleString()}</p>
+            <p><strong>运行时间:</strong> ${formatTime(runningTime)}</p>
+            <p><strong>状态:</strong> <span class="${task.isRunning ? 'status-running' : 'status-stopped'}">${task.isRunning ? '运行中' : '已停止'}</span></p>
+            ${task.lastScreenshot ? `<p><strong>最新截图:</strong> ${task.lastScreenshot}</p>` : ''}
+            
+            <div class="task-controls">
+              ${task.isRunning ? 
+                `<button class="btn-stop" onclick="stopTask('${task.id}')">停止任务</button>` : 
+                `<button class="btn-restart" onclick="restartTask('${task.id}')">重启任务</button>`
+              }
+            </div>
+          `;
+          
+          tasksListContainer.appendChild(taskCard);
+        });
+      } catch (error) {
+        console.error('加载任务失败:', error);
+        tasksListContainer.innerHTML = `<p>加载任务失败: ${error.message}</p>`;
+      }
+    }
+    
+    // 创建新任务
+    async function createTask(event) {
+      event.preventDefault();
+      
+      const formData = new FormData(createTaskForm);
+      const taskData = {
+        url: formData.get('url'),
+        interval: parseInt(formData.get('interval')),
+        width: parseInt(formData.get('width')),
+        height: parseInt(formData.get('height')),
+        maxScreenshots: parseInt(formData.get('maxScreenshots'))
+      };
+      
+      const selector = formData.get('selector');
+      if (selector) {
+        taskData.selector = selector;
+      }
+      
+      try {
+        const response = await fetch('/screenshot/scheduled', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(taskData)
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || '创建任务失败');
+        }
+        
+        const result = await response.json();
+        alert(`任务创建成功! 任务ID: ${result.id}`);
+        createTaskForm.reset();
+        loadTasks();
+      } catch (error) {
+        console.error('创建任务失败:', error);
+        alert(`创建任务失败: ${error.message}`);
+      }
+    }
+    
+    // 停止任务
+    async function stopTask(taskId) {
+      try {
+        const response = await fetch(`/screenshot/scheduled/${taskId}/stop`, {
+          method: 'POST'
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || '停止任务失败');
+        }
+        
+        alert(`任务 ${taskId} 已停止`);
+        loadTasks();
+      } catch (error) {
+        console.error('停止任务失败:', error);
+        alert(`停止任务失败: ${error.message}`);
+      }
+    }
+    
+    // 重启任务
+    async function restartTask(taskId) {
+      try {
+        const response = await fetch(`/screenshot/scheduled/${taskId}/restart`, {
+          method: 'POST'
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || '重启任务失败');
+        }
+        
+        alert(`任务 ${taskId} 已重启`);
+        loadTasks();
+      } catch (error) {
+        console.error('重启任务失败:', error);
+        alert(`重启任务失败: ${error.message}`);
+      }
+    }
+    
+    // 格式化时间
+    function formatTime(seconds) {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      const secs = seconds % 60;
+      
+      return `${hours}小时 ${minutes}分钟 ${secs}秒`;
+    }
+    
+    // 事件监听
+    createTaskForm.addEventListener('submit', createTask);
+    refreshTasksButton.addEventListener('click', loadTasks);
+    
+    // 页面加载时获取任务列表和示例配置
+    window.addEventListener('DOMContentLoaded', () => {
+      loadTasks();
+      loadExamples();
+    });
+    
+    // 全局函数
+    window.stopTask = stopTask;
+    window.restartTask = restartTask;
+    window.loadExampleConfig = loadExampleConfig;
+  </script>
+</body>
+</html> 

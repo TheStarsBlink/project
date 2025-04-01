@@ -1,0 +1,38 @@
+{
+  "examples": [
+    {
+      "name": "百度首页截图",
+      "config": {
+        "url": "https://www.baidu.com",
+        "interval": 5000,
+        "width": 1920,
+        "height": 1080,
+        "maxScreenshots": 10
+      },
+      "description": "每5秒对百度首页进行一次截图，保留最近10张图片"
+    },
+    {
+      "name": "天气网截图",
+      "config": {
+        "url": "http://www.weather.com.cn/",
+        "interval": 30000,
+        "selector": "#realTime",
+        "width": 1280,
+        "height": 720,
+        "maxScreenshots": 20
+      },
+      "description": "每30秒对天气网的实时天气部分进行一次截图，保留最近20张图片"
+    },
+    {
+      "name": "地图变化监控",
+      "config": {
+        "url": "http://localhost:3000",
+        "interval": 10000,
+        "width": 800,
+        "height": 600,
+        "maxScreenshots": 50
+      },
+      "description": "每10秒对本地地图服务进行一次截图，用于监控地图变化"
+    }
+  ]
+} 

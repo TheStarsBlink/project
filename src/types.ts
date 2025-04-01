@@ -72,4 +72,29 @@ export interface BasemapConfig {
     // WMS 参数
     transparent?: boolean;
   };
+}
+
+// 定期截图任务配置接口
+export interface ScheduledScreenshotConfig {
+  id: string;
+  url: string;
+  interval: number;
+  outputDir: string;
+  width?: number;
+  height?: number;
+  selector?: string;
+  options?: ScreenshotOptions;
+  maxScreenshots?: number;
+}
+
+// 定期截图任务状态接口
+export interface ScheduledScreenshotStatus {
+  id: string;
+  url: string;
+  interval: number;
+  outputDir: string;
+  isRunning: boolean;
+  lastScreenshot: string | null;
+  screenshotCount: number;
+  startTime: string;
 } 

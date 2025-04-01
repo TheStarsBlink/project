@@ -381,3 +381,75 @@ docker run -d -p 3000:3000 -v screenshot-data:/app/data --name cesium-screenshot
 ## 许可证
 
 MIT
+
+# 截图服务与底图配置系统
+
+这个项目包含两个部分：
+1. 截图服务 - 提供网页截图和定期截图功能
+2. 底图配置 - 管理Cesium底图配置
+
+## 系统需求
+
+- Node.js v16+
+- npm 或 pnpm 包管理器
+
+## 快速启动
+
+### 方法一：使用启动脚本（推荐）
+
+**Windows用户**:
+双击 `start.bat` 文件或在命令行运行：
+```
+npm run start
+```
+
+**Linux/Mac用户**:
+```bash
+chmod +x start.sh  # 只需第一次运行前执行
+./start.sh
+```
+或者使用npm命令：
+```bash
+npm run start
+```
+
+### 方法二：单独启动服务
+
+**启动截图服务**:
+```bash
+npm run start:screenshot
+```
+
+**启动底图配置**:
+```bash
+npm run start:basemap
+```
+
+## 访问服务
+
+启动后，你可以通过以下地址访问各个服务：
+
+- 截图服务API: http://localhost:3000
+- 底图配置管理界面: http://localhost:5173
+
+截图服务现已集成到底图配置界面中，你可以通过以下路径访问：
+- 首页: http://localhost:5173/dashboard
+- 底图配置: http://localhost:5173/
+- 定期截图管理: http://localhost:5173/scheduled
+
+## 服务说明
+
+### 截图服务
+
+提供以下功能：
+- 单次URL截图
+- Cesium地图截图
+- 地理数据可视化截图
+- 定期自动截图
+
+### 底图配置
+
+提供以下功能：
+- WMTS/WMS/XYZ底图配置管理
+- 底图预览
+- 配置导出与导入

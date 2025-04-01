@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "pnpm --filter cesium-basemap-config dev",
     "build": "pnpm --filter cesium-basemap-config build",
-    "preview": "pnpm --filter cesium-basemap-config preview"
+    "preview": "pnpm --filter cesium-basemap-config preview",
+    "start": "node start-services.js",
+    "start:screenshot": "cd src && npm run dev",
+    "start:basemap": "cd cesium-basemap-config && npm run dev"
   },
   "dependencies": {
     "@types/cors": "^2.8.17",
