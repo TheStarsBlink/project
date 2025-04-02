@@ -12,6 +12,7 @@
 - 支持导出配置为 JSON 文件
 - 支持将配置发送到截图服务器
 - **新增**：支持通过截图序列实现模拟视频流功能
+- **新增**：集中式端口和服务配置管理
 
 ## 技术栈
 
@@ -32,8 +33,15 @@ pnpm install
 
 ### 开发服务器
 
+单独启动前端开发服务器：
 ```bash
 pnpm dev
+```
+
+或使用统一启动脚本同时启动前端和后端服务：
+```bash
+# 项目根目录下
+node start-services.js
 ```
 
 ### 构建项目
@@ -47,6 +55,51 @@ pnpm build
 ```bash
 pnpm preview
 ```
+
+## 全局配置系统
+
+本项目引入了集中式配置管理，所有服务的端口、URL和其他配置项都集中在项目根目录下的 `config.js` 文件中：
+
+```javascript
+module.exports = {
+  // 后端服务配置
+  backend: {
+    port: 3000,                             // 后端服务端口
+    url: 'http://localhost:3000',           // 后端服务URL
+    maxConcurrentJobs: 5,                   // 最大并发任务数
+    dataDir: './data',                      // 数据目录
+  },
+  
+  // 前端服务配置
+  frontend: {
+    port: 5173,                             // 前端开发服务器端口
+    url: 'http://localhost:5173',           // 前端开发服务器URL
+  },
+  
+  // 其他配置...
+}
+```
+
+### 配置优先级
+
+配置加载顺序（优先级从高到低）：
+1. 运行时环境变量
+2. `.env.local` 文件（由 `start-services.js` 动态生成）
+3. `.env.development` 或 `.env.production` 文件
+4. 代码中的默认值
+
+### 配置使用方式
+
+前端应用中通过环境变量获取配置：
+
+```typescript
+// 从环境变量获取服务器URL
+const serverUrl = import.meta.env.VITE_SERVER_URL || import.meta.env.VITE_API_ENDPOINT || 'http://localhost:3000';
+```
+
+### 自定义配置
+
+如需更改端口或其他配置，只需修改根目录下的 `config.js` 文件，然后使用 `node start-services.js` 启动所有服务。
 
 ## 使用说明
 
@@ -72,16 +125,16 @@ pnpm preview
 
 应用的入口仪表板，展示系统状态和各功能入口。
 
-### 4. 截图流测试页面 (/streaming) - 新增
+### 4. 截图流测试页面 (/streaming)
 
 集成到Vue应用的截图流功能测试页面。此页面用于实时测试无头浏览器渲染并通过Socket.IO传输的网页截图流，具有以下特点：
 
 - 支持输入任意URL，后端将加载并实时推送渲染内容
 - 自动连接到后端Socket.IO服务，并优雅处理连接错误
 - 提供直观的连接状态和流状态指示器
+- 使用全局配置中的服务URL，确保连接到正确的后端服务
 - 包含离线模式说明，当后端服务不可用时提供帮助信息
 - 完全响应式设计，适配各种屏幕尺寸
-- 本地缓存Socket.IO客户端库，确保即使后端服务不可用也能正常加载页面
 
 **访问方式：** 点击导航栏中的"截图流测试"链接即可访问。
 
@@ -114,7 +167,7 @@ pnpm preview
    ```
 
 2. **服务端存储**：
-   - 数据通过SQLite数据库持久化存储在截图服务的`DATA_DIR`目录中
+   - 数据通过SQLite数据库持久化存储在截图服务的`DATA_DIR`目录中（由全局配置指定）
    - 使用`basemaps.db`数据库文件
    - 数据以JSON格式序列化后存储
    - 支持按名称或类型查询
@@ -126,12 +179,12 @@ pnpm preview
 
 ### 加载服务器配置
 
-使用以下接口从服务器获取配置：
+使用以下接口从服务器获取配置（URL基于全局配置）：
 
 ```
-GET http://localhost:3000/basemap
-GET http://localhost:3000/basemap/配置名称
-GET http://localhost:3000/basemap/type/wmts
+GET ${serverUrl}/basemap
+GET ${serverUrl}/basemap/配置名称
+GET ${serverUrl}/basemap/type/wmts
 ```
 
 ## 与截图服务集成
@@ -146,10 +199,10 @@ GET http://localhost:3000/basemap/type/wmts
 
 ### 截图接口
 
-使用发送到服务器的配置生成截图：
+使用发送到服务器的配置生成截图（URL基于全局配置）：
 
 ```
-GET http://localhost:3000/screenshot?basemapName=配置名称
+GET ${serverUrl}/screenshot?basemapName=配置名称
 ```
 
 响应将是一个 PNG 格式的图片。
@@ -168,10 +221,11 @@ GET http://localhost:3000/screenshot?basemapName=配置名称
 - 自动处理连接错误和服务不可用情况
 - 离线模式下提供有用的帮助信息
 - 响应式设计，支持移动设备访问
+- 使用全局配置中的服务URL，确保连接到正确的后端
 
 **技术细节：**
 - 使用 Vue 3 Composition API 实现
-- 自动尝试加载本地 Socket.IO 库，失败后再尝试从服务器加载
+- 直接导入 socket.io-client 库，使用 TypeScript 类型定义
 - 包含完整的错误状态管理和重连机制
 
 #### 2. 独立的静态 HTML 页面
@@ -185,8 +239,8 @@ GET http://localhost:3000/screenshot?basemapName=配置名称
 - 同样提供错误处理和状态指示
 
 **访问方式：**
-1. 确保后端截图服务正在运行
-2. 在浏览器中访问 `http://localhost:<port>/webrtc-test.html`
+1. 确保后端截图服务正在运行（使用 `node start-services.js` 或分别启动服务）
+2. 在浏览器中访问 `http://localhost:[前端端口]/webrtc-test.html`
 
 **注意事项：** 无论使用哪种方式，这都不是真正的 WebRTC 视频流，而是通过 Socket.IO 快速传输截图序列实现的模拟流。真正的 WebRTC 实现需要额外的开发工作。
 
@@ -195,16 +249,29 @@ GET http://localhost:3000/screenshot?basemapName=配置名称
 当后端服务不可用时，应用提供以下功能：
 
 1. **优雅的错误处理**：显示友好的错误消息而非控制台错误
-2. **本地资源回退**：使用本地Socket.IO库代替服务器版本
-3. **故障排除指南**：提供启动后端服务的步骤说明
-4. **替代方案建议**：如HTML2Canvas等客户端截图方法的提示
+2. **故障排除指南**：提供启动后端服务的步骤说明
+3. **替代方案建议**：如HTML2Canvas等客户端截图方法的提示
 
 ### 内网部署注意事项
 
 在内网环境部署时：
 
 1. **服务器地址配置**：
-   - 修改`.env`文件中的`VITE_SERVER_URL`环境变量为内网服务器地址
+   - 修改项目根目录下的 `config.js` 文件中的服务URL配置：
+   ```javascript
+   module.exports = {
+     backend: {
+       port: 3000,
+       url: 'http://内网IP:3000',  // 修改为内网IP或主机名
+       // ...
+     },
+     frontend: {
+       port: 8080,
+       url: 'http://内网IP:8080', // 修改为内网IP或主机名
+       // ...
+     }
+   }
+   ```
    - 或在Docker运行时通过环境变量覆盖：
      ```bash
      docker run -p 8080:80 -e VITE_SERVER_URL=http://内网IP:3000 cesium-basemap-config

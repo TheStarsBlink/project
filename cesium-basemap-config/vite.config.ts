@@ -40,7 +40,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: process.env.VITE_API_ENDPOINT || 'http://localhost:3000',
         changeOrigin: true,
         configure: (proxy) => {
           proxy.on('error', (err, req, res) => {
@@ -56,7 +56,7 @@ export default defineConfig({
         }
       },
       '/data': {
-        target: 'http://localhost:3000',
+        target: process.env.VITE_API_ENDPOINT || 'http://localhost:3000',
         changeOrigin: true,
         configure: (proxy) => {
           proxy.on('error', (err, req, res) => {
@@ -71,7 +71,7 @@ export default defineConfig({
         }
       },
       '/screenshot': {
-        target: 'http://localhost:3000',
+        target: process.env.VITE_API_ENDPOINT || 'http://localhost:3000',
         changeOrigin: true,
         configure: (proxy) => {
           proxy.on('error', (err, req, res) => {
@@ -86,7 +86,7 @@ export default defineConfig({
         }
       },
       '/status': {
-        target: 'http://localhost:3000',
+        target: process.env.VITE_API_ENDPOINT || 'http://localhost:3000',
         changeOrigin: true,
         configure: (proxy) => {
           proxy.on('error', (err, req, res) => {
@@ -101,7 +101,7 @@ export default defineConfig({
         }
       },
       '/basemap': {
-        target: 'http://localhost:3000',
+        target: process.env.VITE_API_ENDPOINT || 'http://localhost:3000',
         changeOrigin: true,
         configure: (proxy) => {
           proxy.on('error', (err, req, res) => {
@@ -116,7 +116,7 @@ export default defineConfig({
         }
       },
       '/socket.io': {
-        target: 'http://localhost:3000',
+        target: process.env.VITE_API_ENDPOINT || 'http://localhost:3000',
         changeOrigin: true,
         ws: true,
         configure: (proxy) => {

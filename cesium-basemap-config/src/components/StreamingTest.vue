@@ -14,8 +14,9 @@ const errorState = ref({
   message: ''
 });
 
-// 从环境变量或默认设置获取服务器 URL
-const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
+// 从环境变量获取服务器 URL
+const serverUrl = import.meta.env.VITE_SERVER_URL || import.meta.env.VITE_API_ENDPOINT || 'http://localhost:3000';
+console.log('使用服务器URL:', serverUrl);
 
 function updateStatus(message: string) {
   statusMessage.value = message;

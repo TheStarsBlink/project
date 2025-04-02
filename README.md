@@ -14,6 +14,7 @@
 - 底图配置管理与持久化
 - TypeScript 支持
 - Docker 支持
+- **新增**: 全局配置系统，集中管理所有服务端口和URL
 
 ## 安装
 
@@ -40,6 +41,48 @@ docker-compose up
 # 生产模式
 docker build -t cesium-screenshot .
 docker run -p 3000:3000 cesium-screenshot
+```
+
+## 全局配置系统
+
+项目引入了集中式配置管理，所有服务的端口、URL和其他配置项都集中在根目录下的 `config.js` 文件中：
+
+```javascript
+module.exports = {
+  // 后端服务配置
+  backend: {
+    port: 3000,                             // 后端服务端口
+    url: 'http://localhost:3000',           // 后端服务URL
+    maxConcurrentJobs: 5,                   // 最大并发任务数
+    dataDir: './data',                      // 数据目录
+  },
+  
+  // 前端服务配置
+  frontend: {
+    port: 5173,                             // 前端开发服务器端口
+    url: 'http://localhost:5173',           // 前端开发服务器URL
+  }
+}
+```
+
+### 一键启动
+
+使用以下命令启动所有服务（自动使用 `config.js` 中的配置）：
+
+```bash
+node start-services.js
+```
+
+### 自定义配置
+
+如需修改服务端口或其他配置，只需编辑 `config.js` 文件，无需修改各个服务的配置文件。
+
+### 配置测试
+
+运行配置测试脚本，验证全局配置是否正确加载和应用：
+
+```bash
+node src/examples/test-config.js
 ```
 
 ## API 使用说明
@@ -395,7 +438,17 @@ MIT
 
 ## 快速启动
 
-### 方法一：使用启动脚本（推荐）
+### 方法一：使用全局配置启动（推荐）
+
+在项目根目录执行以下命令，将同时启动截图服务和底图配置系统：
+
+```bash
+node start-services.js
+```
+
+这种方式会自动使用 `config.js` 中的全局配置，启动所有服务并处理服务间的通信。
+
+### 方法二：使用启动脚本
 
 **Windows用户**:
 双击 `start.bat` 文件或在命令行运行：
@@ -413,7 +466,7 @@ chmod +x start.sh  # 只需第一次运行前执行
 npm run start
 ```
 
-### 方法二：单独启动服务
+### 方法三：单独启动服务
 
 **启动截图服务**:
 ```bash
@@ -427,7 +480,7 @@ npm run start:basemap
 
 ## 访问服务
 
-启动后，你可以通过以下地址访问各个服务：
+启动后，你可以通过以下地址访问各个服务（端口根据 `config.js` 中的配置可能有所不同）：
 
 - 截图服务API: http://localhost:3000
 - 底图配置管理界面: http://localhost:5173
@@ -436,6 +489,7 @@ npm run start:basemap
 - 首页: http://localhost:5173/dashboard
 - 底图配置: http://localhost:5173/
 - 定期截图管理: http://localhost:5173/scheduled
+- 截图流测试: http://localhost:5173/streaming
 
 ## 服务说明
 
@@ -446,6 +500,7 @@ npm run start:basemap
 - Cesium地图截图
 - 地理数据可视化截图
 - 定期自动截图
+- 页面内容流式传输（模拟视频流）
 
 ### 底图配置
 

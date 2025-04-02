@@ -23,6 +23,56 @@ src/
 └── README.md            # 项目文档
 ```
 
+## 全局配置系统
+
+本项目使用了集中式配置管理，所有配置项都集中在项目根目录下的 `config.js` 文件中：
+
+```javascript
+module.exports = {
+  // 后端服务配置
+  backend: {
+    port: 3000,                             // 后端服务端口
+    url: 'http://localhost:3000',           // 后端服务URL
+    maxConcurrentJobs: 5,                   // 最大并发任务数
+    dataDir: './data',                      // 数据目录
+  },
+  
+  // 前端服务配置
+  frontend: {
+    port: 5173,                             // 前端开发服务器端口
+    url: 'http://localhost:5173',           // 前端开发服务器URL
+  },
+  
+  // 其他配置...
+}
+```
+
+### 配置加载方式
+
+当使用 `start-services.js` 启动服务时：
+1. 会读取 `config.js` 中的配置
+2. 生成 `.env` 文件并写入配置参数
+3. 通过环境变量将配置传递给服务进程
+
+### 在代码中使用配置
+
+服务器代码中通过环境变量读取配置：
+
+```typescript
+// 设置环境变量和服务器配置
+const port = process.env.PORT || 3000;
+const MAX_CONCURRENT_JOBS = Number(process.env.MAX_CONCURRENT_JOBS) || 5;
+const DATA_DIR = process.env.DATA_DIR || './data';
+```
+
+### 自定义配置
+
+如需更改端口或其他配置，可修改根目录下的 `config.js` 文件，然后使用 `node start-services.js` 启动服务。也可以直接设置环境变量：
+
+```bash
+PORT=4000 MAX_CONCURRENT_JOBS=10 node server.ts
+```
+
 ## 模块功能说明
 
 ### server.ts
@@ -49,6 +99,13 @@ src/
 - Cesium截图路由和处理函数
 - 地理数据截图路由和处理函数
 - 底图配置相关路由和处理函数
+
+### services/stream.ts
+
+截图流服务，包含：
+- 通过 Socket.IO 实现的截图流功能
+- 与 Puppeteer 集成以提供页面内容流
+- 连接管理和错误处理
 
 ## 服务接口
 
@@ -123,7 +180,7 @@ POST /screenshot/geo
 
 本服务还提供了一个基于 Socket.IO 的接口，用于从无头浏览器中"流式传输"内容。注意：这目前是通过快速发送截图序列 (JPEG 格式) 来模拟视频流，而不是真正的 WebRTC 视频流。
 
-**连接:** 客户端需要连接到运行截图服务的 Socket.IO 服务器 (通常与 HTTP 服务器在同一端口)。
+**连接:** 客户端需要连接到运行截图服务的 Socket.IO 服务器 (通常与 HTTP 服务器在同一端口，由全局配置指定)。
 
 **Socket.IO 事件:**
 
@@ -140,7 +197,7 @@ POST /screenshot/geo
         *   参数 (string): 错误信息。
     *   `stream-stopped`: (隐式或显式) 通知客户端流已停止（例如，由于 `stop-stream` 请求或连接断开）。
 
-**注意:** 要使用此功能，需要在客户端包含 Socket.IO 客户端库。
+**注意:** 前端应用已经集成 Socket.IO 客户端库，使用全局配置中的后端服务URL连接。
 
 ### 底图配置接口
 
@@ -194,6 +251,21 @@ DELETE /basemap/config/:name
 ```
 GET /screenshot?basemapName=配置名称
 ```
+
+## 一键启动
+
+项目根目录提供了 `start-services.js` 脚本，用于同时启动后端服务和前端应用：
+
+```bash
+node start-services.js
+```
+
+这个脚本会：
+1. 读取 `config.js` 中的全局配置
+2. 生成所需的环境变量文件
+3. 启动后端服务和前端应用，并传递相应的配置
+4. 使用不同颜色区分服务的日志输出
+5. 在退出时清理临时文件并关闭服务
 
 ## 测试
 
@@ -300,7 +372,7 @@ npm test
 
 ### 自定义配置
 
-可以通过修改`docker-compose.yml`文件中的环境变量来自定义服务配置：
+可以通过修改`docker-compose.yml`文件中的环境变量来自定义服务配置，或者更好的方式是修改项目根目录的`config.js`文件：
 
 ```yaml
 environment:
@@ -311,7 +383,7 @@ environment:
 
 ### 数据持久化
 
-服务使用命名卷来持久化数据：
+服务使用命名卷来持久化数据，数据目录位置由全局配置的 `backend.dataDir` 指定：
 
 ```yaml
 volumes:

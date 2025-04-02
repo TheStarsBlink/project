@@ -25,10 +25,13 @@ const port = process.env.PORT || 3000;
 const MAX_CONCURRENT_JOBS = Number(process.env.MAX_CONCURRENT_JOBS) || 5;
 const DATA_DIR = process.env.DATA_DIR || './data';
 
-// 记录Chrome配置信息
+// 记录服务配置信息
+console.log(`服务配置信息:`);
+console.log(`后端服务端口: ${port}`);
+console.log(`最大并发任务数: ${MAX_CONCURRENT_JOBS}`);
+console.log(`数据存储目录: ${path.resolve(DATA_DIR)}`);
 console.log(`操作系统: ${os.platform()}`);
 console.log(`Chrome路径: ${DEFAULT_BROWSER_CONFIG.executablePath || '由Puppeteer自动查找'}`);
-console.log(`数据存储目录: ${path.resolve(DATA_DIR)}`);
 
 // 创建和启动截图队列
 const screenshotQueue = new ScreenshotQueue(MAX_CONCURRENT_JOBS);

@@ -1,6 +1,6 @@
 module.exports = {
   testEnvironment: 'node',
-  testMatch: ['**/src/**/*.test.ts'],
+  testMatch: ['**/src/**/*.test.ts', '**/src/__tests__/**/*.test.ts'],
   collectCoverageFrom: [
     'src/**/*.ts',
     '!**/node_modules/**',
@@ -20,5 +20,7 @@ module.exports = {
     '^.+\\.ts$': ['ts-jest', {
       tsconfig: 'tsconfig.json'
     }]
-  }
+  },
+  testTimeout: 10000,
+  verbose: true
 }; 
