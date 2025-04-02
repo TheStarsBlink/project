@@ -63,12 +63,13 @@ const retryRoute = () => {
 
 body {
   font-family: Arial, sans-serif;
+  overflow-y: auto;
 }
 
 .app-container {
-  height: 100vh;
+  min-height: 100vh;
   width: 100vw;
-  overflow: hidden;
+  overflow-y: auto;
   position: relative;
 }
 

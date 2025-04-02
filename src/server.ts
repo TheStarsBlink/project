@@ -8,9 +8,19 @@ import { BasemapDatabase } from './services/basemap-db';
 import { setupBasemapRoutes } from './services/basemap-api';
 import { ScreenshotScheduler } from './services/scheduler';
 import { setupSchedulerRoutes } from './services/scheduler-api';
+import http from 'http';
+import { Server as SocketIOServer } from 'socket.io';
+import { setupStreamingRoutes } from './services/stream';
 
 // 设置环境变量和服务器配置
 const app = express();
+const server = http.createServer(app);
+const io = new SocketIOServer(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
 const port = process.env.PORT || 3000;
 const MAX_CONCURRENT_JOBS = Number(process.env.MAX_CONCURRENT_JOBS) || 5;
 const DATA_DIR = process.env.DATA_DIR || './data';
@@ -53,7 +63,10 @@ setupBasemapRoutes(app, basemapDb);
 // 设置定期截图路由
 setupSchedulerRoutes(app, screenshotScheduler, DATA_DIR);
 
+// 设置 WebRTC 流路由
+setupStreamingRoutes(io, screenshotQueue);
+
 // 启动服务器
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`服务器运行在 http://localhost:${port}`);
 }); 

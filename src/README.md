@@ -119,6 +119,29 @@ POST /screenshot/geo
 }
 ```
 
+### 视频流 (截图流) 接口 (通过 Socket.IO)
+
+本服务还提供了一个基于 Socket.IO 的接口，用于从无头浏览器中"流式传输"内容。注意：这目前是通过快速发送截图序列 (JPEG 格式) 来模拟视频流，而不是真正的 WebRTC 视频流。
+
+**连接:** 客户端需要连接到运行截图服务的 Socket.IO 服务器 (通常与 HTTP 服务器在同一端口)。
+
+**Socket.IO 事件:**
+
+*   **客户端 -> 服务器:**
+    *   `start-stream`: 请求开始推流。
+        *   参数 (Object): `{ url: string, width?: number, height?: number }`
+            *   `url`: 需要加载和推流的页面 URL。
+            *   `width`, `height`: (可选) 无头浏览器视口大小，默认为 1280x720。
+    *   `stop-stream`: 请求停止当前的推流。
+*   **服务器 -> 客户端:**
+    *   `stream-frame`: 发送视频流的一帧 (Base64 编码的 JPEG 图片)。客户端需要将其解码并显示。
+    *   `stream-started`: 通知客户端流已成功开始（页面加载完成，截图循环已启动）。
+    *   `stream-error`: 通知客户端在启动或推流过程中发生错误。
+        *   参数 (string): 错误信息。
+    *   `stream-stopped`: (隐式或显式) 通知客户端流已停止（例如，由于 `stop-stream` 请求或连接断开）。
+
+**注意:** 要使用此功能，需要在客户端包含 Socket.IO 客户端库。
+
 ### 底图配置接口
 
 #### 创建/更新底图配置

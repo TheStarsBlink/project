@@ -3,6 +3,7 @@
     <div class="nav-bar">
       <router-link to="/dashboard" class="nav-btn">服务首页</router-link>
       <router-link to="/scheduled" class="nav-btn">定期截图管理</router-link>
+      <router-link to="/streaming" class="nav-btn">截图流测试</router-link>
     </div>
     
     <div class="config-form">

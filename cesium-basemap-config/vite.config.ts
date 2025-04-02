@@ -41,28 +41,104 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://localhost:3000',
-        changeOrigin: true
+        changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('error', (err, req, res) => {
+            // 服务不可用时的错误处理
+            res.writeHead(503, {
+              'Content-Type': 'application/json',
+            });
+            res.end(JSON.stringify({ 
+              error: true, 
+              message: '后端服务不可用，请确保服务已启动' 
+            }));
+          });
+        }
       },
       '/data': {
         target: 'http://localhost:3000',
-        changeOrigin: true
+        changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('error', (err, req, res) => {
+            res.writeHead(503, {
+              'Content-Type': 'application/json',
+            });
+            res.end(JSON.stringify({ 
+              error: true, 
+              message: '后端服务不可用，请确保服务已启动' 
+            }));
+          });
+        }
       },
       '/screenshot': {
         target: 'http://localhost:3000',
-        changeOrigin: true
+        changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('error', (err, req, res) => {
+            res.writeHead(503, {
+              'Content-Type': 'application/json',
+            });
+            res.end(JSON.stringify({ 
+              error: true, 
+              message: '后端服务不可用，请确保服务已启动' 
+            }));
+          });
+        }
       },
       '/status': {
         target: 'http://localhost:3000',
-        changeOrigin: true
+        changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('error', (err, req, res) => {
+            res.writeHead(503, {
+              'Content-Type': 'application/json',
+            });
+            res.end(JSON.stringify({ 
+              error: true, 
+              message: '后端服务不可用，请确保服务已启动' 
+            }));
+          });
+        }
       },
       '/basemap': {
         target: 'http://localhost:3000',
-        changeOrigin: true
+        changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('error', (err, req, res) => {
+            res.writeHead(503, {
+              'Content-Type': 'application/json',
+            });
+            res.end(JSON.stringify({ 
+              error: true, 
+              message: '后端服务不可用，请确保服务已启动' 
+            }));
+          });
+        }
+      },
+      '/socket.io': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        ws: true,
+        configure: (proxy) => {
+          proxy.on('error', (err, req, res) => {
+            // 如果是 WebSocket 请求，无法直接响应
+            if (!res.writeHead) return;
+            
+            res.writeHead(503, {
+              'Content-Type': 'application/json',
+            });
+            res.end(JSON.stringify({ 
+              error: true, 
+              message: '后端服务不可用，请确保服务已启动' 
+            }));
+          });
+        }
       }
     }
   },
   optimizeDeps: {
-    exclude: ['cesium']
+    exclude: ['cesium'],
+    include: ['socket.io-client']
   },
   build: {
     chunkSizeWarningLimit: 2000,

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC (截图流) 测试</title>
+    <style>
+        body { 
+            font-family: sans-serif; 
+            padding: 20px; 
+            margin: 0;
+            overflow-y: auto; /* 允许内容溢出时垂直滚动 */
+        }
+        #videoContainer { 
+            margin-top: 20px; 
+            border: 1px solid #ccc; 
+            height: auto; /* 自适应高度 */
+            min-height: 480px; 
+            max-width: 100%; /* 防止在小屏幕上溢出 */
+            width: 640px; 
+            background-color: #f0f0f0; 
+            position: relative;
+            overflow: hidden; /* 防止内容溢出容器 */
+        }
+        #streamImage { 
+            max-width: 100%; 
+            height: auto; /* 保持图像比例 */
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+        }
+        #status { 
+            margin-top: 10px; 
+            font-style: italic; 
+        }
+        .controls { 
+            margin-bottom: 15px;
+            display: flex;
+            flex-wrap: wrap; /* 在小屏幕上换行 */
+            align-items: center;
+            gap: 10px; /* 元素之间的间距 */
+        }
+        .controls label, .controls input, .controls button { 
+            margin-right: 10px; 
+        }
+        @media (max-width: 700px) {
+            #urlInput {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+            .controls {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .button-group {
+                display: flex;
+                gap: 10px;
+                margin-top: 10px;
+            }
+        }
+    </style>
+    <!-- 引入 Socket.IO 客户端库 -->
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <h1>WebRTC (截图流) 测试</h1>
+    <div class="controls">
+        <label for="urlInput">URL:</label>
+        <input type="text" id="urlInput" value="https://www.bing.com" size="40">
+        <div class="button-group">
+            <button id="startButton">开始推流</button>
+            <button id="stopButton" disabled>停止推流</button>
+        </div>
+    </div>
+    <div id="videoContainer">
+        <img id="streamImage" alt="视频流" />
+    </div>
+    <div id="status">状态：未连接</div>
+
+    <script>
+        const urlInput = document.getElementById('urlInput');
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const videoContainer = document.getElementById('videoContainer');
+        const streamImage = document.getElementById('streamImage');
+        const statusDiv = document.getElementById('status');
+
+        // 从 .env 文件或默认值获取服务器地址
+        // 注意：在纯静态 HTML 中直接访问 .env 不安全或不可行
+        // 这里硬编码或通过构建过程注入更合适
+        const serverUrl = 'http://localhost:3000'; // 硬编码服务器地址
+        let socket;
+
+        function updateStatus(message) {
+            statusDiv.textContent = `状态：${message}`;
+            console.log(`状态：${message}`);
+        }
+
+        function connectSocket() {
+            updateStatus('连接中...');
+            // 连接到 Socket.IO 服务器
+            socket = io(serverUrl);
+
+            socket.on('connect', () => {
+                updateStatus(`已连接到服务器 (${socket.id})`);
+                startButton.disabled = false;
+            });
+
+            socket.on('disconnect', () => {
+                updateStatus('已断开连接');
+                startButton.disabled = true;
+                stopButton.disabled = true;
+                streamImage.src = '';
+            });
+
+            socket.on('connect_error', (err) => {
+                updateStatus(`连接错误: ${err.message}`);
+                startButton.disabled = true;
+                stopButton.disabled = true;
+            });
+
+            // 监听来自服务器的视频帧 (Base64 编码的图片)
+            socket.on('stream-frame', (imageBase64) => {
+                streamImage.src = `data:image/jpeg;base64,${imageBase64}`;
+            });
+
+            socket.on('stream-started', () => {
+                updateStatus('流已开始');
+                startButton.disabled = true;
+                stopButton.disabled = false;
+            });
+
+            socket.on('stream-error', (errorMessage) => {
+                updateStatus(`流错误: ${errorMessage}`);
+                alert(`流错误: ${errorMessage}`);
+                startButton.disabled = false;
+                stopButton.disabled = true;
+                streamImage.src = '';
+            });
+
+             socket.on('stream-stopped', () => { // 自定义事件，表示流已停止
+                updateStatus('流已停止');
+                startButton.disabled = false;
+                stopButton.disabled = true;
+                streamImage.src = '';
+            });
+        }
+
+        startButton.addEventListener('click', () => {
+            if (socket && socket.connected) {
+                const url = urlInput.value.trim();
+                if (!url) {
+                    alert('请输入有效的 URL');
+                    return;
+                }
+                updateStatus('请求开始推流...');
+                socket.emit('start-stream', { url: url, width: 640, height: 480 });
+                startButton.disabled = true; // 防止重复点击
+            }
+        });
+
+        stopButton.addEventListener('click', () => {
+            if (socket && socket.connected) {
+                updateStatus('请求停止推流...');
+                socket.emit('stop-stream');
+                stopButton.disabled = true; // 防止重复点击
+                // 服务端会处理清理并触发 disconnect 或自定义事件
+            }
+        });
+
+        // 页面加载时自动连接
+        connectSocket();
+
+    </script>
+</body>
+</html> 
